@@ -73,15 +73,32 @@ export const DEFAULT_SETTINGS = {
   theme: 'dark',
   syncIntervalSec: 30,
   lockOnHide: false,
+  // Phase 2 — portfolio / risk
+  cash: 0,
+  marketFilter: 'ALL',                                  // 'ALL' | 'MY' | 'US' | 'HK'
+  fxRates: { USD_MYR: 4.00, HKD_USD: 0.128, SGD_USD: 0.74, CNY_USD: 0.138 },
+  risk:    { levWarn: 30, levCrit: 50, conc: 40, spec: 35 },
 };
 
 export function getSettings() {
-  const stored = get(KEYS.SETTINGS, {});
-  return { ...DEFAULT_SETTINGS, ...(stored || {}) };
+  const stored = get(KEYS.SETTINGS, {}) || {};
+  // Merge with nested-object awareness so a partial save never drops keys.
+  return {
+    ...DEFAULT_SETTINGS,
+    ...stored,
+    fxRates: { ...DEFAULT_SETTINGS.fxRates, ...(stored.fxRates || {}) },
+    risk:    { ...DEFAULT_SETTINGS.risk,    ...(stored.risk    || {}) },
+  };
 }
 
 export function saveSettings(patch) {
-  const next = { ...getSettings(), ...(patch || {}) };
+  const current = getSettings();
+  const next = {
+    ...current,
+    ...(patch || {}),
+    fxRates: { ...current.fxRates, ...((patch && patch.fxRates) || {}) },
+    risk:    { ...current.risk,    ...((patch && patch.risk)    || {}) },
+  };
   set(KEYS.SETTINGS, next);
   return next;
 }

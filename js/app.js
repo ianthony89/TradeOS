@@ -10,6 +10,7 @@ import { setLang, applyI18n }     from './i18n.js';
 import * as Auth                  from './auth.js';
 import * as Sync                  from './sync.js';
 import * as Router                from './router.js';
+import * as State                 from './state.js';
 import { toast }                  from './toast.js';
 import { mountSidebar }           from '../components/sidebar.js';
 import { mountTopbar }            from '../components/topbar.js';
@@ -56,16 +57,19 @@ async function bootstrap() {
   //    - returning user: enter-PIN flow
   await Auth.showLock();
 
-  // 4. Reveal app shell, mount components
+  // 4. Load holdings from storage (recomputes derived fields)
+  State.init();
+
+  // 5. Reveal app shell, mount components
   document.getElementById('app').hidden = false;
   mountSidebar();
   mountTopbar();
 
-  // 5. Register routes + start router
+  // 6. Register routes + start router
   _registerRoutes();
   Router.start();
 
-  // 6. Start sync engine (uses configured interval if any)
+  // 7. Start sync engine (uses configured interval if any)
   Sync.setIntervalSec(s.syncIntervalSec || 30);
   Sync.start();
 }
