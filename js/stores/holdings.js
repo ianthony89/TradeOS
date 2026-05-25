@@ -45,20 +45,21 @@ export function init() {
     try {
       rows = await Sheets.fetchHoldings();
     } catch (e) {
-      console.warn('[TradeOS holdings] fetchHoldings threw — keeping last known state:', e);
-      toast('[Sync] Holdings fetch failed — kept last state', 'warn');
+      console.warn('[holdings] sync fetch threw — preserving last known state:', e.message || e);
       return;
     }
 
-    // Validate payload before overwriting: never replace valid data with empty/malformed response
     if (!Array.isArray(rows)) {
-      console.warn('[TradeOS holdings] sync returned non-array payload — keeping last known state:', rows);
-      toast('[Sync] Holdings response invalid — kept last state', 'warn');
+      console.warn('[holdings] sync returned non-array — preserving last known state. Got:', typeof rows);
       return;
     }
-    if (rows.length === 0 && _raw.length > 0) {
-      console.warn('[TradeOS holdings] sync returned empty array while local state has data — skipping overwrite');
-      toast('[Sync] Empty holdings from server — kept last state', 'warn');
+
+    // Count rows that would survive _sanitizeRaw's symbol filter (same logic as setHoldings).
+    // If the effective count would drop to 0 while we already have data, reject the response —
+    // it almost certainly means the sheet is empty/mid-write or misconfigured.
+    const effectiveCount = rows.filter(r => r && String(r.symbol || '').trim()).length;
+    if (effectiveCount === 0 && _raw.length > 0) {
+      console.warn(`[holdings] sync would wipe ${_raw.length} local rows with 0 valid sheet rows — skipping overwrite`);
       return;
     }
 

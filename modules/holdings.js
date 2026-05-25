@@ -335,22 +335,23 @@ async function _doImport(rows, broker = 'CSV') {
     return;
   }
 
-  // If API is configured, write to Google Sheet
+  // *** Set local store FIRST — before any async API call ***
+  // This ensures _raw.length > 0 immediately, so any concurrent sync
+  // that reads an empty/partial sheet will be blocked by the guard in
+  // stores/holdings.js and will NOT overwrite the freshly imported data.
+  Holdings.setHoldings(normalized);
+  try { localStorage.setItem('tradeos.v4.csv.lastImport', new Date().toISOString()); } catch (e) { /* noop */ }
+
+  // If API is configured, push to Google Sheet (fire and forget toast)
   if (Api.isConfigured()) {
     toast(t('csv_uploading'), 'info');
     try {
       await Api.call('csv.import', { rows: normalized }, { timeoutMs: 30000 });
     } catch (e) {
       toast(t('csv_upload_error', { msg: e.message }), 'error', 6000);
-      // Still update local state even if remote write failed
+      // Local state is already set above — no rollback needed
     }
   }
-
-  // Always update local store
-  Holdings.setHoldings(normalized);
-
-  // Persist import timestamp
-  try { localStorage.setItem('tradeos.v4.csv.lastImport', new Date().toISOString()); } catch (e) { /* noop */ }
 
   // Refresh quotes for the newly imported symbols
   Quotes.runOnce();

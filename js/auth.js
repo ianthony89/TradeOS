@@ -66,6 +66,7 @@ export async function verify(pin) {
 let _buffer = '';
 let _mode = 'enter';        // 'enter' | 'create' | 'confirm'
 let _firstPin = null;       // captured during 'create' before 'confirm'
+let _autoTimer = null;      // debounce timer for auto-submit in 'enter' mode
 
 const els = {
   wrap: null, title: null, sub: null, dots: null, pad: null, msg: null, brand: null,
@@ -124,19 +125,35 @@ function _setMsg(text, isError) {
   }
 }
 
+function _cancelAutoTimer() {
+  if (_autoTimer) { clearTimeout(_autoTimer); _autoTimer = null; }
+}
+
 function _press(key) {
-  if (key === 'clear') { _buffer = ''; _setMsg(''); _renderDots(); return; }
-  if (key === 'back')  { _buffer = _buffer.slice(0, -1); _setMsg(''); _renderDots(); return; }
+  if (key === 'clear') { _cancelAutoTimer(); _buffer = ''; _setMsg(''); _renderDots(); return; }
+  if (key === 'back')  { _cancelAutoTimer(); _buffer = _buffer.slice(0, -1); _setMsg(''); _renderDots(); return; }
   if (!/^\d$/.test(key)) return;
   if (_buffer.length >= MAX_LEN) { _setMsg(t('lock_msg_max'), true); return; }
   _buffer += key;
   _setMsg('');
   _renderDots();
-  // Auto-submit immediately when MAX length is reached
-  if (_buffer.length === MAX_LEN) { _submit(); }
+
+  if (_buffer.length === MAX_LEN) {
+    // At maximum length — submit immediately, no debounce needed
+    _cancelAutoTimer();
+    _submit();
+  } else if (_buffer.length >= MIN_LEN && _mode === 'enter') {
+    // Reached minimum PIN length in enter mode.
+    // Debounce: submit after 500ms of no further input.
+    // This allows users with longer PINs to keep typing without triggering
+    // a premature verify, while 4-digit PIN users get seamless auto-submit.
+    _cancelAutoTimer();
+    _autoTimer = setTimeout(() => { _autoTimer = null; _submit(); }, 500);
+  }
 }
 
 async function _submit() {
+  _cancelAutoTimer();
   if (_buffer.length < MIN_LEN) { _setMsg(t('lock_msg_min'), true); return; }
   if (_mode === 'enter') {
     const ok = await verify(_buffer);
@@ -213,6 +230,7 @@ function _bindKeyboard() {
 /** Show the lock UI. Returns a promise that resolves when unlocked. */
 export function showLock(opts = {}) {
   _grab();
+  _cancelAutoTimer();
   _locked = true;
   _buffer = '';
   _firstPin = null;
