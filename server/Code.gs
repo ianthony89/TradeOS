@@ -59,6 +59,8 @@ var HANDLERS = {
   'alerts.list':    function ()        { return listAlerts();   },
   'alerts.save':    function (payload) { return saveAlert(payload || {}); },
   'alerts.delete':  function (payload) { return deleteAlert(payload || {}); },
+  // Phase 5.3 — factory reset
+  'reset.all':      function ()        { return resetAllSheets(); },
 };
 
 // --- Entry points ---
@@ -418,4 +420,32 @@ function deleteAlert(payload) {
     }
   }
   return { deleted: false };
+}
+
+/* ============================================================
+   PHASE 5.3 — FACTORY RESET
+   Clears all data rows (preserves header row) in every tracked
+   sheet: Holdings, Watchlist, Journal, Alerts.
+   Missing sheets are silently skipped (nothing to clear).
+   ============================================================ */
+
+function resetAllSheets() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('No bound spreadsheet');
+
+  var targets = [SHEETS.holdings, SHEETS.watchlist, SHEETS.journal, SHEETS_ALERTS];
+  var cleared = [];
+  var skipped = [];
+
+  targets.forEach(function (name) {
+    var sh = ss.getSheetByName(name);
+    if (!sh) { skipped.push(name); return; }
+    var lastRow = sh.getLastRow();
+    if (lastRow > 1) {
+      sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).clearContent();
+      cleared.push(name);
+    }
+  });
+
+  return { cleared: cleared, skipped: skipped };
 }

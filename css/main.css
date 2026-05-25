@@ -477,6 +477,33 @@ label { display: block; font-size: 11px; letter-spacing: 1.2px; text-transform: 
   vertical-align: middle;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* Factory Reset checkbox-option rows */
+.reset-options {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-top: 16px;
+}
+.reset-option {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-border);
+  cursor: pointer;
+  transition: var(--tx-fast);
+  font-size: 13.5px;
+  user-select: none;
+}
+.reset-option:not(.reset-option--fixed):hover {
+  border-color: var(--panel-border-strong);
+  background: rgba(130,180,255,0.05);
+}
+.reset-option--fixed { opacity: 0.5; cursor: default; }
+.reset-option input[type=checkbox] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent);
+  cursor: inherit; flex-shrink: 0;
+}
+.reset-option span:first-of-type { flex: 1; }
+
 .modal-close {
   width: 32px; height: 32px;
   display: grid; place-items: center;

@@ -147,7 +147,7 @@ export function mount(root) {
             <input type="file" id="snapFile" accept=".json" style="display:none"/>
           </div>
           <div>
-            <button class="btn danger ghost" id="btnResetAll" data-i18n="modal_reset_btn">${t('modal_reset_btn')}</button>
+            <button class="btn danger ghost" id="btnResetAll" data-i18n="btn_factory_reset">${t('btn_factory_reset')}</button>
           </div>
         </div>
       </div>
@@ -331,19 +331,79 @@ async function _importSnapshot(file) {
 }
 
 async function _resetAll() {
-  const ok = await Modal.confirm({
-    title:        t('modal_reset_title'),
-    message:      t('modal_reset_msg'),
-    warning:      t('modal_reset_warn'),
-    confirmLabel: t('modal_reset_btn'),
-    cancelLabel:  t('cancel'),
+  const result = await _showFactoryResetDialog();
+  if (!result) return;  // cancelled
+
+  if (result.clearSheet && Api.isConfigured()) {
+    toast(t('factory_reset_sheet_clearing'), 'info');
+    try {
+      await Api.call('reset.all', {}, { timeoutMs: 20000 });
+    } catch (e) {
+      // Non-fatal — inform and proceed with local wipe regardless
+      toast(t('factory_reset_sheet_fail', { msg: e.message || e }), 'error', 6000);
+    }
+  }
+
+  toast(t('toast_reset_done'), 'info', 1500);
+  setTimeout(() => { wipeAll(); location.reload(); }, 400);
+}
+
+function _showFactoryResetDialog() {
+  return new Promise((resolve) => {
+    const apiOk = Api.isConfigured();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-wrap';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML = `
+      <div class="modal">
+        <div class="modal-head">
+          <h2 class="modal-title">${escapeAttr(t('factory_reset_title'))}</h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-msg">${escapeAttr(t('factory_reset_msg'))}</p>
+          <div class="reset-options">
+            <label class="reset-option reset-option--fixed">
+              <input type="checkbox" checked disabled>
+              <span>${escapeAttr(t('factory_reset_local'))}</span>
+              <span class="muted">(${escapeAttr(t('factory_reset_required'))})</span>
+            </label>
+            <label class="reset-option${apiOk ? '' : ' reset-option--fixed'}">
+              <input type="checkbox" id="rSheet"${apiOk ? '' : ' disabled'}>
+              <span>${escapeAttr(t('factory_reset_sheet'))}</span>
+              ${!apiOk ? `<span class="muted">(${escapeAttr(t('factory_reset_api_required'))})</span>` : ''}
+            </label>
+          </div>
+          <div class="modal-warn">${escapeAttr(t('factory_reset_warn'))}</div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn ghost" id="rCancel">${escapeAttr(t('cancel'))}</button>
+          <button class="btn danger" id="rConfirm">${escapeAttr(t('factory_reset_btn'))}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('show'));
+
+    const cleanup = (result) => {
+      overlay.classList.remove('show');
+      setTimeout(() => { try { document.body.removeChild(overlay); } catch (e) {} }, 250);
+      resolve(result);
+    };
+
+    overlay.querySelector('#rCancel').addEventListener('click', () => cleanup(null));
+    overlay.querySelector('#rConfirm').addEventListener('click', () => {
+      const sheetCb = overlay.querySelector('#rSheet');
+      cleanup({ clearLocal: true, clearSheet: !!(sheetCb && sheetCb.checked) });
+    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(null); });
+
+    const _escHandler = (e) => {
+      if (e.key === 'Escape') { cleanup(null); document.removeEventListener('keydown', _escHandler); }
+    };
+    document.addEventListener('keydown', _escHandler);
   });
-  if (!ok) return;
-  toast(t('toast_reset_done'), 'info', 2000);
-  setTimeout(() => {
-    wipeAll();
-    location.reload();
-  }, 400);
 }
 
 function escapeAttr(s) {

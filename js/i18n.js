@@ -418,6 +418,19 @@ export const I18N = {
     modal_reset_btn:        'Erase & Restart',
     toast_reset_done:       'Data cleared. Restarting…',
     holdings_last_import_pre: 'Last import:',
+
+    // ---- Phase 5.3 — Factory Reset dialog ----
+    btn_factory_reset:            'Factory Reset…',
+    factory_reset_title:          'Factory Reset',
+    factory_reset_msg:            'Choose what to clear:',
+    factory_reset_local:          'Local browser data',
+    factory_reset_sheet:          'Google Sheet backend data',
+    factory_reset_required:       'required',
+    factory_reset_api_required:   'API not configured',
+    factory_reset_warn:           'Backend deletion is permanent — Holdings, Watchlist, Journal and Alerts sheets will be erased.',
+    factory_reset_sheet_clearing: 'Clearing Google Sheet data…',
+    factory_reset_sheet_fail:     'Sheet clear failed: {msg}. Local data will still be wiped.',
+    factory_reset_btn:            'Erase & Restart',
   },
 
   zh: {
@@ -819,6 +832,19 @@ export const I18N = {
     modal_reset_btn:        '清除并重启',
     toast_reset_done:       '数据已清除，正在重启…',
     holdings_last_import_pre: '上次导入:',
+
+    // ---- Phase 5.3 — 出厂重置对话框 ----
+    btn_factory_reset:            '出厂重置…',
+    factory_reset_title:          '出厂重置',
+    factory_reset_msg:            '请选择要清除的内容:',
+    factory_reset_local:          '本地浏览器数据',
+    factory_reset_sheet:          'Google Sheet 后端数据',
+    factory_reset_required:       '必选',
+    factory_reset_api_required:   'API 未配置',
+    factory_reset_warn:           '后端数据删除不可恢复 — 将清除 Holdings、Watchlist、Journal 和 Alerts 表格。',
+    factory_reset_sheet_clearing: '正在清除 Google Sheet 数据…',
+    factory_reset_sheet_fail:     'Sheet 清除失败: {msg}。本地数据仍将被清除。',
+    factory_reset_btn:            '清除并重启',
   },
 };
 
