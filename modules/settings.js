@@ -180,6 +180,8 @@ function _bind(root) {
       setLang(lang);
       applyI18n();
     }
+    // Notify topbar to re-render greeting with the new name/lang.
+    window.dispatchEvent(new CustomEvent('tradeos:name-changed'));
     toast(t('toast_settings_saved'), 'success');
   });
 

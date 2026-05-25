@@ -124,6 +124,9 @@ export function mountTopbar() {
   _renderGreeting();
   _renderClocks();
 
+  // Re-render greeting whenever name or lang changes from Settings.
+  window.addEventListener('tradeos:name-changed', _renderGreeting);
+
   // Clock ticker — re-render once a second.
   if (_clockTimer) clearInterval(_clockTimer);
   _clockTimer = setInterval(() => {
