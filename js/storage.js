@@ -10,6 +10,7 @@ const NS = 'tradeos.v4';
 export const KEYS = {
   PIN:           `${NS}.auth.pin`,
   PIN_SALT:      `${NS}.auth.salt`,
+  PIN_LEN:       `${NS}.auth.pinLen`,    // stored PIN length for exact auto-submit
   LOCK_ON_HIDE:  `${NS}.auth.lockOnHide`,
   SETTINGS:      `${NS}.settings`,
   API_ENDPOINT:  `${NS}.api.endpoint`,

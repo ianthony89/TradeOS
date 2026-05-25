@@ -49,7 +49,15 @@ export async function setPin(pin) {
   const hash = await _hash(pin, salt);
   setRaw(KEYS.PIN_SALT, salt);
   setRaw(KEYS.PIN, hash);
+  setRaw(KEYS.PIN_LEN, String(pin.length));   // persist length for auto-submit
   return true;
+}
+
+/** Return the stored PIN length, or null if not set (legacy user). */
+function _getPinLen() {
+  const raw = getRaw(KEYS.PIN_LEN);
+  const n = raw ? parseInt(raw, 10) : NaN;
+  return (n >= MIN_LEN && n <= MAX_LEN) ? n : null;
 }
 
 /** Verify entered PIN against stored hash. */
@@ -66,7 +74,7 @@ export async function verify(pin) {
 let _buffer = '';
 let _mode = 'enter';        // 'enter' | 'create' | 'confirm'
 let _firstPin = null;       // captured during 'create' before 'confirm'
-let _autoTimer = null;      // debounce timer for auto-submit in 'enter' mode
+let _autoTimer = null;      // only used as fallback for legacy users without stored PIN length
 
 const els = {
   wrap: null, title: null, sub: null, dots: null, pad: null, msg: null, brand: null,
@@ -138,17 +146,19 @@ function _press(key) {
   _setMsg('');
   _renderDots();
 
-  if (_buffer.length === MAX_LEN) {
-    // At maximum length — submit immediately, no debounce needed
-    _cancelAutoTimer();
-    _submit();
-  } else if (_buffer.length >= MIN_LEN && _mode === 'enter') {
-    // Reached minimum PIN length in enter mode.
-    // Debounce: submit after 500ms of no further input.
-    // This allows users with longer PINs to keep typing without triggering
-    // a premature verify, while 4-digit PIN users get seamless auto-submit.
-    _cancelAutoTimer();
-    _autoTimer = setTimeout(() => { _autoTimer = null; _submit(); }, 500);
+  if (_mode !== 'enter') return;  // create/confirm — user presses ✓ explicitly
+
+  const pinLen = _getPinLen();
+
+  if (pinLen !== null) {
+    // Deterministic: submit exactly when buffer matches the stored PIN length.
+    // No guessing, no debounce — fires on the precise digit count.
+    if (_buffer.length === pinLen) _submit();
+  } else {
+    // Legacy fallback: PIN_LEN not stored (user set PIN before this build).
+    // Auto-submit at MAX_LEN; for shorter PINs, Enter key is required.
+    // PIN_LEN will be stored on next PIN change, enabling exact match thereafter.
+    if (_buffer.length === MAX_LEN) _submit();
   }
 }
 
