@@ -2,7 +2,7 @@
 
 > AI-powered trading operating system — portfolio management, research, journaling, and decision support.
 
-**Current version:** `v4.0.0` (Phase 3 — Google Sheets sync wired)
+**Current version:** `v4.0.0` (Phase 4 — live market quotes + enhanced threats)
 **Predecessor:** v3.7 archived at [`legacy/v3.7.html`](legacy/v3.7.html) — source of truth for ported design tokens, i18n strings, market-session logic, CSV parser, AI prompt library.
 
 ---
@@ -158,6 +158,27 @@ and a few Simplified Chinese terms are accepted).
 | `emotion` | mood · feeling · 心理 · 情绪                       | no                |
 | `lesson`  | takeaway · learned · 总结 · 教训                   | no                |
 
+## Live quotes (Phase 4)
+
+A separate engine pulls live prices every 60 seconds via the same GAS
+endpoint. The browser cannot reach Yahoo directly (CORS), so the GAS
+script proxies the request server-side using `UrlFetchApp`.
+
+- **Primary**: Yahoo Finance v7 (`query1.finance.yahoo.com`) — no API key.
+- **Fallback**: Finnhub `/quote` — only used if Yahoo fails. Set a
+  `FINNHUB_TOKEN` in **Apps Script editor → Project Settings → Script
+  properties** to enable it.
+- **Symbol mapping** (canonical → Yahoo): `BRK.B → BRK-B`, `5555 → 5555.KL`,
+  `currency=MYR → .KL suffix`, `currency=HKD → .HK suffix`. Bursa numeric
+  tickers and `BRK.B`-style classes Just Work.
+- **Cache**: every successful quote is persisted to `tradeos.v4.quotes`
+  so the dashboard renders live prices on refresh before the first fetch
+  completes. **No fake fallback** — on API failure the cached prices stay
+  put and the live-quotes pill turns red.
+- **Where prices flow**: Quotes store → Holdings store re-derives →
+  Dashboard / Holdings table re-render automatically. Sheet `lastPrice`
+  is used only when no quote is available for that symbol.
+
 ## Sync
 
 - Auto-sync runs every **30 seconds** (configurable in Settings).
@@ -174,6 +195,6 @@ and a few Simplified Chinese terms are accepted).
 
 ## Roadmap
 
-- **Phase 4** — AI Lab port (prompt templates × engines), Ask Alpha, Compare.
-- **Phase 5** — Write actions (holdings.upsert, journal.append, watchlist.add).
-- **Phase 6** — Real-time quote provider integration, push notifications.
+- **Phase 5** — AI Lab port (prompt templates × engines), Ask Alpha, Compare.
+- **Phase 6** — Write actions (holdings.upsert, journal.append, watchlist.add).
+- **Phase 7** — Intraday charting + alerts on threat-engine state transitions.

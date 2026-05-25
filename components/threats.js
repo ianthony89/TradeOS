@@ -32,12 +32,14 @@ export function renderThreats(rootBody, countEl, { list, riskScore }, hasHolding
     const sev = t(th.severityKey);
     const title = t(th.titleKey);
     const msg = _composeMsg(th);
+    const action = th.actionKey ? t(th.actionKey) : '';
     return `
       <div class="threat ${th.tone}">
         <span class="ico">${th.ico}</span>
         <div class="body">
           <div class="severity">${escapeHtml(sev)}</div>
           <p><strong>${escapeHtml(title)}</strong> — <span style="color:var(--text-2)">${msg}</span></p>
+          ${action ? `<p class="threat-action">↳ ${escapeHtml(action)}</p>` : ''}
         </div>
       </div>`;
   }).join('');

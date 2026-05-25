@@ -9,6 +9,7 @@ import { KEYS, get, set, remove, getSettings } from '../storage.js';
 import { recompute } from '../domain/portfolio.js';
 import * as Sync   from '../sync.js';
 import * as Sheets from '../sheets.js';
+import * as Quotes from '../quotes.js';
 
 let _holdings = [];        // recomputed (derived fields populated)
 let _raw = [];             // raw shape persisted to storage
@@ -21,7 +22,7 @@ function _load() {
 }
 
 function _refresh() {
-  _holdings = recompute(_raw, getSettings());
+  _holdings = recompute(_raw, getSettings(), Quotes.getAll());
 }
 
 function _persistAndEmit() {
@@ -42,6 +43,9 @@ export function init() {
     const rows = await Sheets.fetchHoldings();
     setHoldings(rows);
   });
+  // Re-derive (and re-emit) whenever live quotes update so the dashboard
+  // gets fresh marketValue / plUSD / dayChangePct without a sheet sync.
+  Quotes.subscribe(() => { _refresh(); _emit(); });
 }
 
 export function getAll() { return _holdings; }

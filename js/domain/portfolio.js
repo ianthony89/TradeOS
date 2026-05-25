@@ -10,18 +10,34 @@ import { classifyRisk, classifyStatus, suggestedAction, detectMarket } from './r
 /**
  * Return a new holdings array with all derived fields recomputed:
  *   marketValueLocal, plLocal, marketValue (USD), plUSD, plPct,
- *   risk, status, action, market.
+ *   risk, status, action, market, priceSource, priceTs.
+ *
+ * `quotes` is an optional map `{ SYMBOL: { price, prevClose, ts, source } }`
+ * (from js/quotes.js). When a quote exists for a position, the live price
+ * overrides the sheet's lastPrice — the sheet's value is used as the
+ * fallback when no quote is available (API failure, market closed, etc).
  *
  * Caller passes immutable input — useful for predictable rendering.
  */
-export function recompute(holdings, settings) {
+export function recompute(holdings, settings, quotes) {
   const rates = settings && settings.fxRates;
+  const q = quotes || {};
   return (holdings || []).map(raw => {
     const h = { ...raw };
-    h.qty       = Number(h.qty) || 0;
-    h.avgCost   = Number(h.avgCost) || 0;
-    h.lastPrice = Number(h.lastPrice) || 0;
-    h.currency  = (h.currency || 'USD').toUpperCase();
+    h.qty      = Number(h.qty) || 0;
+    h.avgCost  = Number(h.avgCost) || 0;
+    h.currency = (h.currency || 'USD').toUpperCase();
+
+    const sheetPrice = Number(h.lastPrice) || 0;
+    const liveQ = q[h.symbol];
+    const livePrice = liveQ && Number(liveQ.price) > 0 ? Number(liveQ.price) : null;
+    h.lastPrice   = livePrice != null ? livePrice : sheetPrice;
+    h.priceSource = livePrice != null ? (liveQ.source || 'live') : (sheetPrice > 0 ? 'sheet' : 'none');
+    h.priceTs     = liveQ && liveQ.ts ? liveQ.ts : null;
+    h.prevClose   = liveQ && Number(liveQ.prevClose) > 0 ? Number(liveQ.prevClose) : null;
+    h.dayChangePct = (h.prevClose && h.prevClose > 0)
+      ? ((h.lastPrice / h.prevClose) - 1) * 100
+      : null;
 
     h.marketValueLocal = h.qty * h.lastPrice;
     h.plLocal          = (h.lastPrice - h.avgCost) * h.qty;
@@ -67,10 +83,23 @@ export function getStats(holdings, settings) {
   const specPct = portfolio > 0 ? (specExposure / portfolio) * 100 : 0;
   const riskPct = portfolio > 0 ? ((levExposure + specExposure) / portfolio) * 100 : 0;
 
+  // Today's P/L (only meaningful for positions with a live prevClose)
+  let dayChangeUSD = 0;
+  let dayPriced = 0;
+  arr.forEach(h => {
+    if (h.prevClose != null && h.prevClose > 0 && h.qty > 0) {
+      const dLocal = (h.lastPrice - h.prevClose) * h.qty;
+      dayChangeUSD += toUSD(dLocal, h.currency, settings && settings.fxRates);
+      dayPriced++;
+    }
+  });
+  const dayChangePct = totalMV > 0 && dayPriced > 0 ? (dayChangeUSD / totalMV) * 100 : null;
+
   return {
     totalMV, totalCost, totalPL, totalPLPct,
     winners, losers, cash, portfolio,
     levExposure, specExposure, levPct, specPct, riskPct,
+    dayChangeUSD, dayChangePct, dayPriced,
     count: arr.length,
   };
 }

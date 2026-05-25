@@ -9,6 +9,7 @@ import { t, applyI18n } from '../js/i18n.js';
 import { getSettings, saveSettings } from '../js/storage.js';
 import * as Holdings  from '../js/stores/holdings.js';
 import * as Watchlist from '../js/stores/watchlist.js';
+import * as Quotes    from '../js/quotes.js';
 import * as Router from '../js/router.js';
 import { getStats, applyMarketFilter, topMovers } from '../js/domain/portfolio.js';
 import { detectThreats } from '../js/domain/threats.js';
@@ -40,7 +41,10 @@ export function mount(root) {
         <div class="mf" data-f="US">${t('mf_us')}</div>
         <div class="mf" data-f="MY">${t('mf_my')}</div>
       </div>
-      <div id="dashSyncBtn"></div>
+      <div class="hstack">
+        <span id="dashQuotesPill" class="pill" data-state="idle" title=""><span class="dot"></span><span class="lbl">${t('quotes_idle')}</span></span>
+        <div id="dashSyncBtn"></div>
+      </div>
     </div>
 
     <div class="stats" id="statsRow"></div>
@@ -110,6 +114,9 @@ export function mount(root) {
 
   // Manual sync button in the toolbar.
   _unsubs.push(mountSyncButton(root.querySelector('#dashSyncBtn')));
+
+  // Live-quotes status pill.
+  _unsubs.push(_bindQuotesPill(root));
 
   // Re-render when any synced store changes.
   _unsubs.push(Holdings.onChange(() => _renderAll(root)));
@@ -288,4 +295,38 @@ function _moverRow(h) {
         <div class="usd">${fmt.usd(h.plUSD)}</div>
       </span>
     </div>`;
+}
+
+/* ---------- Live-quotes pill ---------- */
+
+function _bindQuotesPill(root) {
+  const pill = root.querySelector('#dashQuotesPill');
+  const lbl  = pill.querySelector('.lbl');
+  const click = () => Quotes.runOnce();
+  pill.addEventListener('click', click);
+  pill.style.cursor = 'pointer';
+
+  const unsub = Quotes.subscribe(snap => {
+    pill.dataset.state = snap.state;
+    pill.classList.remove('warn', 'crit', 'info');
+    switch (snap.state) {
+      case Quotes.STATES.FETCHING:     pill.classList.add('info'); lbl.textContent = t('quotes_fetching'); break;
+      case Quotes.STATES.OK:           lbl.textContent = `${t('quotes_ok')} · ${_ago(snap.lastOk)}`; break;
+      case Quotes.STATES.ERROR:        pill.classList.add('crit'); lbl.textContent = t('quotes_error'); break;
+      case Quotes.STATES.OFFLINE:      pill.classList.add('warn'); lbl.textContent = t('quotes_offline'); break;
+      case Quotes.STATES.UNCONFIGURED: pill.classList.add('warn'); lbl.textContent = t('quotes_unconfigured'); break;
+      default:                         lbl.textContent = t('quotes_idle');
+    }
+    pill.title = snap.lastError ? snap.lastError : t('quotes_click_refresh');
+  });
+
+  return () => { pill.removeEventListener('click', click); unsub(); };
+}
+
+function _ago(ms) {
+  if (!ms) return '';
+  const diffS = Math.round((Date.now() - ms) / 1000);
+  if (diffS < 5)   return t('sync_just_now');
+  if (diffS < 60)  return t('sync_seconds_ago', { n: diffS });
+  return t('sync_minutes_ago', { n: Math.round(diffS / 60) });
 }

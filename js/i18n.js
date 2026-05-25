@@ -185,6 +185,40 @@ export const I18N = {
     watchlist_empty_sub: 'Add rows to your Watchlist sheet — they will appear here on the next sync.',
     empty_journal_t:     'No journal entries',
     journal_empty_sub:   'Add rows to your Journal sheet — they will appear here on the next sync.',
+
+    // ---- Phase 4 — live quotes + enhanced threats ----
+    quotes_idle:         'Quotes idle',
+    quotes_fetching:     'Fetching quotes…',
+    quotes_ok:           'Live',
+    quotes_error:        'Quote error',
+    quotes_offline:      'Offline',
+    quotes_unconfigured: 'Quotes: API not set',
+    quotes_click_refresh:'Click to refresh live prices',
+
+    // New threats
+    threat_sector_warn_t:  'Sector Concentration',
+    threat_sector_crit_t:  'Extreme Sector Concentration',
+    threat_correlated_t:   'Correlated Top Holdings',
+    threat_drawdown_t:     'Significant Drawdown',
+
+    // Recommended actions (per threat)
+    action_lev_crit:       'Cut leveraged ETF exposure to under 30% within 1–2 sessions.',
+    action_lev_warn:       'Pare leveraged ETFs back below your warn threshold.',
+    action_spec:           'Trim or exit your lowest-conviction speculative names.',
+    action_conc_warn:      'Trim the largest holding into strength to restore diversification.',
+    action_conc_extreme:   'Reduce the top position immediately — single-stock blow-up risk.',
+    action_sector:         'Diversify across sectors — consider trimming the dominant sector by half.',
+    action_correlated:     'Your top holdings move together. Add uncorrelated assets (defensives, cash, bonds).',
+    action_drawdown:       'Review losers; tighten stops; pause new entries until the book stabilizes.',
+    action_dead_warn:      'Decide each DEAD position: exit at the next bounce or commit to a clear plan.',
+    action_dead_crit:      'Liquidate DEAD positions to free capital and reset the book.',
+    action_weak:           'Audit weak names for thesis breaks — exit those without a catalyst.',
+    action_loss:           'Stop adding to losers; focus capital on remaining winners.',
+    action_cash:           'Build a cash buffer (5–15%) so dips become opportunities, not stress.',
+    action_highcash:       'Stage cash into 2–3 entries on confirmed setups.',
+    action_locks:          'Trim a third of each big winner back to your cost basis.',
+    action_strong:         'Document what is working; do not chase — protect the gains.',
+    action_balanced:       'Maintain discipline; review weekly; rotate the bottom 10% only.',
   },
 
   zh: {
@@ -358,6 +392,38 @@ export const I18N = {
     watchlist_empty_sub: '在 Watchlist 工作表中添加行,下次同步后会显示在这里。',
     empty_journal_t:     '暂无交易记录',
     journal_empty_sub:   '在 Journal 工作表中添加行,下次同步后会显示在这里。',
+
+    // ---- Phase 4 ----
+    quotes_idle:         '行情空闲',
+    quotes_fetching:     '获取行情中…',
+    quotes_ok:           '实时',
+    quotes_error:        '行情错误',
+    quotes_offline:      '离线',
+    quotes_unconfigured: '行情:未配置 API',
+    quotes_click_refresh:'点击刷新实时价格',
+
+    threat_sector_warn_t:  '板块集中度',
+    threat_sector_crit_t:  '板块极度集中',
+    threat_correlated_t:   '前三仓位高度相关',
+    threat_drawdown_t:     '显著回撤',
+
+    action_lev_crit:       '在 1–2 个交易日内将杠杆 ETF 比重降至 30% 以下。',
+    action_lev_warn:       '将杠杆 ETF 降回警告阈值以下。',
+    action_spec:           '减仓或退出信念最弱的投机标的。',
+    action_conc_warn:      '逢强减第一大持仓,恢复分散度。',
+    action_conc_extreme:   '立即减仓第一大持仓 — 单股爆雷风险。',
+    action_sector:         '跨板块分散 — 主导板块至少减半。',
+    action_correlated:     '前三大持仓同步波动。加入不相关资产(防御、现金、债券)。',
+    action_drawdown:       '复盘亏损;收紧止损;暂停新建仓位直到组合稳定。',
+    action_dead_warn:      '为每只 DEAD 持仓做决策:反弹退出,或制定明确计划。',
+    action_dead_crit:      '清算 DEAD 持仓,释放资金,重设组合。',
+    action_weak:           '审计弱势持仓是否逻辑破坏;无催化剂的直接退出。',
+    action_loss:           '停止补仓亏损股;资金集中在剩余赢家上。',
+    action_cash:           '保留 5–15% 现金缓冲,把下跌变成机会而不是压力。',
+    action_highcash:       '分 2–3 次在确认的形态上建仓。',
+    action_locks:          '每只大赢家减仓三分之一以收回成本。',
+    action_strong:         '记录有效做法;不要追涨 — 守住收益。',
+    action_balanced:       '保持纪律;每周复盘;仅轮动垫底 10%。',
   },
 };
 

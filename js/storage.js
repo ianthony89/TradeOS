@@ -21,6 +21,10 @@ export const KEYS = {
   HOLDINGS:      `${NS}.holdings`,
   WATCHLIST:     `${NS}.watchlist`,
   JOURNAL:       `${NS}.journal`,
+  // Phase 4 — live quotes
+  QUOTES:         `${NS}.quotes`,
+  QUOTES_LAST_AT: `${NS}.quotes.lastAt`,
+  QUOTES_LAST_OK: `${NS}.quotes.lastOk`,
 };
 
 export function getRaw(key) {
@@ -72,6 +76,7 @@ export const DEFAULT_SETTINGS = {
   lang: 'en',
   theme: 'dark',
   syncIntervalSec: 30,
+  quotesIntervalSec: 60,
   lockOnHide: false,
   // Phase 2 — portfolio / risk
   cash: 0,
