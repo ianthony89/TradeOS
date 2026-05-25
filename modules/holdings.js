@@ -6,15 +6,19 @@
 
 import { t, applyI18n } from '../js/i18n.js';
 import { getSettings } from '../js/storage.js';
-import * as State from '../js/state.js';
+import * as Holdings from '../js/stores/holdings.js';
+import * as Sync from '../js/sync.js';
+import { isConfigured } from '../js/api.js';
 import { applyMarketFilter } from '../js/domain/portfolio.js';
 import { classifyRisk, RISK_CLASSES } from '../js/domain/risk.js';
 import { fmt, escapeHtml } from '../js/domain/format.js';
 import { toast } from '../js/toast.js';
+import { mountSyncButton } from '../components/sync-button.js';
 
 const STATUSES = ['HEALTHY','WATCH','WEAK','DEAD'];
 
 let _stateUnsub = null;
+let _syncUnmount = null;
 let _sortCol = 'marketValue';
 let _sortDir = -1;             // -1 desc, +1 asc
 let _search = '';
@@ -37,6 +41,7 @@ export function mount(root) {
             ${STATUSES.map(s => `<option ${_fStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
           <button class="btn sm ghost danger" id="hClear" data-i18n="clear_all">${t('clear_all')}</button>
+          <span id="hSyncBtn"></span>
         </div>
       </div>
       <div class="panel-body table-wrap" id="hTableBody"></div>
@@ -45,7 +50,7 @@ export function mount(root) {
     <div class="panel">
       <div class="panel-head">
         <h3 data-i18n="btn_manual">${t('btn_manual')}</h3>
-        <button class="btn sm" id="hDemo" data-i18n="btn_demo">${t('btn_demo')}</button>
+        ${isConfigured() ? '' : `<button class="btn sm" id="hDemo" data-i18n="btn_demo">${t('btn_demo')}</button>`}
       </div>
       <div class="panel-body">
         <div class="form-row">
@@ -88,11 +93,13 @@ export function mount(root) {
   applyI18n(root);
   _bind(root);
   _renderTable(root);
-  _stateUnsub = State.onChange(() => _renderTable(root));
+  _stateUnsub  = Holdings.onChange(() => _renderTable(root));
+  _syncUnmount = mountSyncButton(root.querySelector('#hSyncBtn'));
 }
 
 export function unmount(root) {
-  if (_stateUnsub) { _stateUnsub(); _stateUnsub = null; }
+  if (_stateUnsub)  { _stateUnsub();  _stateUnsub  = null; }
+  if (_syncUnmount) { _syncUnmount(); _syncUnmount = null; }
   root.innerHTML = '';
 }
 
@@ -110,15 +117,18 @@ function _bind(root) {
     _renderTable(root);
   });
   root.querySelector('#hClear').addEventListener('click', () => {
-    if (!State.getHoldings().length) return;
+    if (!Holdings.getHoldings().length) return;
     if (!confirm(t('confirm_clear_holdings'))) return;
-    State.clearAll();
+    Holdings.clearAll();
     toast(t('toast_cleared'), 'info');
   });
-  root.querySelector('#hDemo').addEventListener('click', () => {
-    State.setHoldings(_demoData());
-    toast(t('toast_sample_loaded'), 'success');
-  });
+  const demoBtn = root.querySelector('#hDemo');
+  if (demoBtn) {
+    demoBtn.addEventListener('click', () => {
+      Holdings.setHoldings(_demoData());
+      toast(t('toast_sample_loaded'), 'success');
+    });
+  }
   root.querySelector('#hAdd').addEventListener('click', () => _handleAdd(root));
 }
 
@@ -129,15 +139,15 @@ function _handleAdd(root) {
   const lastPrice = parseFloat(root.querySelector('#aLast').value);
   const currency  = root.querySelector('#aCcy').value;
   if (!symbol || !qty) { toast(t('toast_sym_req'), 'error'); return; }
-  const existing = State.getRawHoldings().find(h => h.symbol === symbol);
-  State.upsertHolding({ symbol, qty, avgCost, lastPrice, currency, risk: classifyRisk(symbol) });
+  const existing = Holdings.getRawHoldings().find(h => h.symbol === symbol);
+  Holdings.upsertHolding({ symbol, qty, avgCost, lastPrice, currency, risk: classifyRisk(symbol) });
   ['#aSym','#aQty','#aAvg','#aLast'].forEach(id => { root.querySelector(id).value = ''; });
   toast(`${symbol} ${existing ? t('toast_updated') : t('toast_added')}`, 'success');
 }
 
 function _renderTable(root) {
   const body = root.querySelector('#hTableBody');
-  const all = State.getHoldings();
+  const all = Holdings.getHoldings();
   if (!all.length) {
     body.innerHTML = `
       <div class="empty" style="padding:40px 24px;">
@@ -222,7 +232,7 @@ function _renderTable(root) {
       e.stopPropagation();
       const sym = btn.dataset.remove;
       if (!confirm(t('confirm_remove_pos', { sym }))) return;
-      State.removeHolding(sym);
+      Holdings.removeHolding(sym);
       toast(`${sym} ${t('toast_removed')}`, 'info');
     });
   });

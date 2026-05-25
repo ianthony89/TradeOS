@@ -7,7 +7,8 @@
 
 import { t, applyI18n } from '../js/i18n.js';
 import { getSettings, saveSettings } from '../js/storage.js';
-import * as State from '../js/state.js';
+import * as Holdings  from '../js/stores/holdings.js';
+import * as Watchlist from '../js/stores/watchlist.js';
 import * as Router from '../js/router.js';
 import { getStats, applyMarketFilter, topMovers } from '../js/domain/portfolio.js';
 import { detectThreats } from '../js/domain/threats.js';
@@ -17,8 +18,9 @@ import { renderBars }  from '../js/charts/bars.js';
 import { renderPLBars } from '../js/charts/plbars.js';
 import { renderHeatmap } from '../js/charts/heatmap.js';
 import { renderThreats } from '../components/threats.js';
+import { mountSyncButton } from '../components/sync-button.js';
 
-let _stateUnsub = null;
+let _unsubs = [];
 let _resizeTimer = null;
 let _onResize = null;
 let _chartCleanups = [];
@@ -32,12 +34,13 @@ const ICONS = {
 
 export function mount(root) {
   root.innerHTML = `
-    <div class="hstack" style="margin-bottom:14px;">
+    <div class="hstack" style="margin-bottom:14px; justify-content: space-between;">
       <div class="market-filter" role="tablist" id="dashMarketFilter">
         <div class="mf" data-f="ALL">${t('mf_all')}</div>
         <div class="mf" data-f="US">${t('mf_us')}</div>
         <div class="mf" data-f="MY">${t('mf_my')}</div>
       </div>
+      <div id="dashSyncBtn"></div>
     </div>
 
     <div class="stats" id="statsRow"></div>
@@ -105,8 +108,12 @@ export function mount(root) {
   _bindFilter(root);
   _renderAll(root);
 
-  // Re-render when holdings change
-  _stateUnsub = State.onChange(() => _renderAll(root));
+  // Manual sync button in the toolbar.
+  _unsubs.push(mountSyncButton(root.querySelector('#dashSyncBtn')));
+
+  // Re-render when any synced store changes.
+  _unsubs.push(Holdings.onChange(() => _renderAll(root)));
+  _unsubs.push(Watchlist.onChange(() => _renderAll(root)));
 
   // Re-render on viewport resize (sidebar collapse → wider charts).
   // Debounced. Observed at the window level, not on the root, to avoid
@@ -119,8 +126,9 @@ export function mount(root) {
 }
 
 export function unmount(root) {
-  if (_stateUnsub) { _stateUnsub(); _stateUnsub = null; }
-  if (_onResize)   { window.removeEventListener('resize', _onResize); _onResize = null; }
+  _unsubs.forEach(fn => { try { fn(); } catch (e) {} });
+  _unsubs = [];
+  if (_onResize) { window.removeEventListener('resize', _onResize); _onResize = null; }
   clearTimeout(_resizeTimer);
   _disposeCharts();
   root.innerHTML = '';
@@ -148,7 +156,7 @@ function _bindFilter(root) {
 function _renderAll(root) {
   _disposeCharts();
   const settings = getSettings();
-  const all = State.getHoldings();
+  const all = Holdings.getAll();
   const list = applyMarketFilter(all, settings.marketFilter);
 
   _renderStats(root, list, settings);
@@ -205,7 +213,7 @@ function _renderStats(root, list, settings) {
     },
     {
       label: t('stat_watchlist'),
-      value: '0',
+      value: String(Watchlist.getAll().length),
       sub:   t('tracking_ops'),
     },
   ];

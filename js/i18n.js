@@ -173,6 +173,18 @@ export const I18N = {
     toast_sample_loaded: 'Demo portfolio loaded',
     confirm_clear_holdings: 'Remove ALL holdings? This cannot be undone.',
     confirm_remove_pos: 'Remove {sym} from your portfolio?',
+
+    // ---- Phase 3 — watchlist + journal ----
+    item: 'item', items: 'items',
+    entry: 'entry', entries: 'entries',
+    added: 'Added',
+    prio_normal: 'NORMAL', prio_high: 'HIGH PRIORITY', prio_spec: 'SPECULATIVE',
+    label_catalyst: 'Catalyst', label_urgency: 'Urgency',
+    reason_l: 'Reason:', emotion_l: 'Emotion:', lesson_l: 'Lesson:',
+    empty_watch_t:       'Watchlist is empty',
+    watchlist_empty_sub: 'Add rows to your Watchlist sheet — they will appear here on the next sync.',
+    empty_journal_t:     'No journal entries',
+    journal_empty_sub:   'Add rows to your Journal sheet — they will appear here on the next sync.',
   },
 
   zh: {
@@ -334,6 +346,18 @@ export const I18N = {
     toast_sample_loaded: '示例组合已加载',
     confirm_clear_holdings: '删除所有持仓?此操作无法撤销。',
     confirm_remove_pos: '从持仓中移除 {sym}?',
+
+    // ---- Phase 3 ----
+    item: '条', items: '条',
+    entry: '条记录', entries: '条记录',
+    added: '添加于',
+    prio_normal: '普通', prio_high: '高优先级', prio_spec: '投机性',
+    label_catalyst: '催化剂', label_urgency: '紧迫度',
+    reason_l: '理由:', emotion_l: '情绪:', lesson_l: '总结:',
+    empty_watch_t:       '自选股为空',
+    watchlist_empty_sub: '在 Watchlist 工作表中添加行,下次同步后会显示在这里。',
+    empty_journal_t:     '暂无交易记录',
+    journal_empty_sub:   '在 Journal 工作表中添加行,下次同步后会显示在这里。',
   },
 };
 

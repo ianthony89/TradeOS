@@ -1,14 +1,17 @@
 /* ============================================================
-   TradeOS v4.0 — state
-   Single source of truth for holdings. Persists to localStorage.
-   Modules subscribe via onChange(fn) to react when state mutates.
+   TradeOS v4.0 — stores/holdings
+   Source of truth for the user's holdings. Persisted locally
+   (so the dashboard renders instantly before sync completes)
+   and refreshed from the Google Sheet on every sync tick.
    ============================================================ */
 
-import { KEYS, get, set, remove, getSettings } from './storage.js';
-import { recompute } from './domain/portfolio.js';
+import { KEYS, get, set, remove, getSettings } from '../storage.js';
+import { recompute } from '../domain/portfolio.js';
+import * as Sync   from '../sync.js';
+import * as Sheets from '../sheets.js';
 
-let _holdings = [];                   // recomputed (derived fields populated)
-let _raw = [];                        // raw shape persisted to storage
+let _holdings = [];        // recomputed (derived fields populated)
+let _raw = [];             // raw shape persisted to storage
 const _listeners = new Set();
 
 function _load() {
@@ -33,9 +36,19 @@ function _emit() {
 
 /* ---------- Public ---------- */
 
-export function init() { _load(); }
+export function init() {
+  _load();
+  Sync.register('holdings', async () => {
+    const rows = await Sheets.fetchHoldings();
+    setHoldings(rows);
+  });
+}
 
+export function getAll() { return _holdings; }
+/** @deprecated v4.0 — use getAll(). Kept for migration period. */
 export function getHoldings() { return _holdings; }
+export function getRaw() { return _raw.slice(); }
+/** @deprecated v4.0 — use getRaw(). */
 export function getRawHoldings() { return _raw.slice(); }
 
 export function onChange(fn) {
@@ -43,15 +56,12 @@ export function onChange(fn) {
   return () => _listeners.delete(fn);
 }
 
-/** Recompute derived fields without changing raw data — for use after settings update. */
-export function recomputeNow() {
-  _refresh();
-  _emit();
-}
+/** Recompute derived fields without changing raw data — call after settings change. */
+export function recomputeNow() { _refresh(); _emit(); }
 
-/** Replace the whole list. */
+/** Replace the whole list (used by sync ingestion + demo data + bulk import). */
 export function setHoldings(list) {
-  _raw = (list || []).map(_sanitizeRaw);
+  _raw = (list || []).map(_sanitizeRaw).filter(r => r.symbol);
   _persistAndEmit();
 }
 
@@ -92,7 +102,7 @@ function _sanitizeRaw(input) {
     currency:  (r.currency || 'USD').toUpperCase(),
     name:      r.name || '',
   };
-  if (r.risk) out.risk = r.risk;   // preserve manual overrides
+  if (r.risk) out.risk = r.risk;
   if (r.note) out.note = r.note;
   return out;
 }

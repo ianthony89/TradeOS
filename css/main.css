@@ -919,6 +919,60 @@ tbody tr:last-child td { border-bottom: none; }
 .legend .lg { display: inline-flex; align-items: center; gap: 6px; }
 .legend .sw { width: 10px; height: 10px; border-radius: 3px; box-shadow: 0 0 6px currentColor; }
 
+/* Watchlist cards */
+.watch-item {
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: rgba(130,180,255,0.03);
+  margin-bottom: 10px;
+  transition: all var(--tx-fast);
+  position: relative;
+}
+.watch-item:hover { border-color: var(--panel-border-strong); background: rgba(130,180,255,0.06); transform: translateX(2px); }
+.watch-item .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.watch-item .ttl { font-weight: 700; font-size: 15px; letter-spacing: 0.3px; }
+.watch-item .note { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-top: 4px; }
+.watch-item .note b { color: var(--text-2); font-weight: 600; }
+.watch-item .meta { display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
+.priority-HIGH        { color: var(--red); }
+.priority-NORMAL      { color: var(--accent); }
+.priority-SPECULATIVE { color: var(--amber); }
+
+/* Journal entries */
+.journal-entry {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--panel-border);
+  background: rgba(130,180,255,0.03);
+  margin-bottom: 10px;
+  position: relative;
+  transition: var(--tx-fast);
+}
+.journal-entry:hover { border-color: var(--panel-border-strong); }
+.journal-entry .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.journal-entry .date { font-size: 11px; color: var(--text-mute); letter-spacing: 0.4px; }
+.journal-entry .ticker { font-weight: 700; font-size: 14px; }
+.action-buy  { color: var(--green);  font-weight: 700; font-size: 10px; padding: 3px 9px; border-radius: 6px; background: var(--green-soft); letter-spacing: 0.8px; }
+.action-sell { color: var(--red);    font-weight: 700; font-size: 10px; padding: 3px 9px; border-radius: 6px; background: var(--red-soft);   letter-spacing: 0.8px; }
+.action-trim { color: var(--amber);  font-weight: 700; font-size: 10px; padding: 3px 9px; border-radius: 6px; background: var(--amber-soft); letter-spacing: 0.8px; }
+.action-add  { color: var(--accent); font-weight: 700; font-size: 10px; padding: 3px 9px; border-radius: 6px; background: rgba(78,167,255,0.14); letter-spacing: 0.8px; }
+.journal-entry .field { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; line-height: 1.45; }
+.journal-entry .field b { color: var(--text-2); font-weight: 600; margin-right: 4px; }
+
+/* Sync button (in-module manual refresh) */
+.sync-btn { display: inline-flex; align-items: center; gap: 6px; }
+.sync-btn .ind {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-mute);
+  transition: var(--tx-fast);
+}
+.sync-btn[data-state="ok"]           .ind { background: var(--green);  box-shadow: 0 0 8px var(--green-glow); }
+.sync-btn[data-state="syncing"]      .ind { background: var(--accent); box-shadow: 0 0 8px var(--accent-glow); animation: pulse 1.2s infinite; }
+.sync-btn[data-state="error"]        .ind { background: var(--red);    box-shadow: 0 0 8px var(--red-glow); }
+.sync-btn[data-state="offline"]      .ind { background: var(--amber);  box-shadow: 0 0 8px var(--amber-glow); }
+.sync-btn[data-state="unconfigured"] .ind { background: var(--text-mute); }
+
 /* Market filter pills */
 .market-filter { display: inline-flex; gap: 4px; padding: 4px; background: var(--panel-bg); border: 1px solid var(--panel-border); border-radius: 999px; }
 .market-filter .mf {

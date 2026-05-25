@@ -2,7 +2,7 @@
 
 > AI-powered trading operating system — portfolio management, research, journaling, and decision support.
 
-**Current version:** `v4.0.0` (Phase 1 — architecture + shell)
+**Current version:** `v4.0.0` (Phase 3 — Google Sheets sync wired)
 **Predecessor:** v3.7 archived at [`legacy/v3.7.html`](legacy/v3.7.html) — source of truth for ported design tokens, i18n strings, market-session logic, CSV parser, AI prompt library.
 
 ---
@@ -36,11 +36,18 @@
   sync.js                    30s auto-sync engine + status event bus
   i18n.js                    en/zh dictionary + market session helpers
   toast.js                   notification stack
+  sheets.js                  GAS adapter — fetchHoldings/Watchlist/Journal + alias normalize
+/js/stores/
+  holdings.js                holdings store + sync handler registration
+  watchlist.js               watchlist store + sync handler registration
+  journal.js                 journal store + sync handler registration
+/js/domain/                  pure functions (fx, risk, portfolio, threats, format)
+/js/charts/                  donut / bars / plbars / heatmap renderers
 /modules/
-  dashboard.js               Phase 1 stub
-  holdings.js                Phase 1 stub
-  watchlist.js               Phase 1 stub
-  journal.js                 Phase 1 stub
+  dashboard.js               live stats, threats, charts, movers, sync button
+  holdings.js                live table, filters, manual add, demo (when API off)
+  watchlist.js               live watchlist cards
+  journal.js                 live journal entries
   ai.js                      Phase 1 stub
   settings.js                Phase 1 — real (PIN, API, theme, lang, sync)
 /server/
@@ -110,10 +117,63 @@ Then open <http://localhost:8080>.
 
 ---
 
+## Google Sheets schema (Phase 3)
+
+The GAS script reads three tabs from its bound spreadsheet. **Sheet names
+must match exactly.** The first row is the header row; column order doesn't
+matter. Extra columns are ignored. Column names are matched case-insensitively
+against the alias table in `js/sheets.js` (English, common broker variants,
+and a few Simplified Chinese terms are accepted).
+
+### `Holdings` sheet
+| column      | aliases                                                            | required |
+|-------------|--------------------------------------------------------------------|----------|
+| `symbol`    | ticker · code · stock · 代码                                       | yes      |
+| `qty`       | quantity · shares · units · position · 数量 · 持有数量             | yes      |
+| `avgCost`   | avg cost · average cost · cost · cost basis · 成本价 · 平均成本价  | yes      |
+| `lastPrice` | last price · last · price · market price · current · 现价          | yes      |
+| `currency`  | ccy · 币种 (defaults to `USD`)                                     | no       |
+| `name`      | company · 名称                                                     | no       |
+| `risk`      | manual risk-class override                                         | no       |
+| `note`      | per-position note                                                  | no       |
+
+### `Watchlist` sheet
+| column      | aliases                                              | required |
+|-------------|------------------------------------------------------|----------|
+| `ticker`    | symbol · code · 代码                                 | yes      |
+| `priority`  | 优先级 (NORMAL / HIGH PRIORITY / SPECULATIVE)        | no       |
+| `risk`      | risk class · 风险                                    | no       |
+| `catalyst`  | 催化剂                                               | no       |
+| `urgency`   | 紧迫度 (LOW / MEDIUM / HIGH)                         | no       |
+| `note`      | thesis · notes · 备注 · 关注理由                     | no       |
+| `added`     | date · 日期                                          | no       |
+
+### `Journal` sheet
+| column    | aliases                                            | required          |
+|-----------|----------------------------------------------------|-------------------|
+| `date`    | when · 日期                                        | yes (or ticker)   |
+| `ticker`  | symbol · code · 代码                               | yes (or date)     |
+| `action`  | side · op · 操作 (BUY / SELL / TRIM / ADD)         | no                |
+| `reason`  | thesis · setup · rationale · 理由 · 计划           | no                |
+| `emotion` | mood · feeling · 心理 · 情绪                       | no                |
+| `lesson`  | takeaway · learned · 总结 · 教训                   | no                |
+
+## Sync
+
+- Auto-sync runs every **30 seconds** (configurable in Settings).
+- Each tick: `ping` the API, then run every store's registered handler in
+  sequence. Holdings, Watchlist, and Journal each register their own sync
+  handler from their `init()`, so the loop pulls all three sheets per tick.
+- Sync **pauses** while the PIN lock is engaged and **resumes** on unlock
+  or on the `online` event after a connection drop.
+- Manual sync: click the topbar sync pill, or use the **Refresh** button
+  on Dashboard / Holdings / Watchlist / Journal.
+- On API failure the last successful payload remains in `localStorage` —
+  there is **no demo data fallback** (the Demo Data button on Holdings is
+  hidden when the API is configured).
+
 ## Roadmap
 
-- **Phase 2** — Holdings module (storage shape, CSV import port, dashboard stats wire-up, GAS `holdings.list` / `holdings.upsert` actions).
-- **Phase 3** — Watchlist, Journal, Thesis Vault — with sync handlers.
 - **Phase 4** — AI Lab port (prompt templates × engines), Ask Alpha, Compare.
-- **Phase 5** — Charts (donut, bars, P/L, heatmap), threat engine, posture engine.
+- **Phase 5** — Write actions (holdings.upsert, journal.append, watchlist.add).
 - **Phase 6** — Real-time quote provider integration, push notifications.

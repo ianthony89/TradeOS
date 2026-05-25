@@ -1,15 +1,30 @@
 /* ============================================================
-   TradeOS v4.0 — Google Apps Script backend (starter template)
+   TradeOS v4.0 — Google Apps Script backend
    Deploy as: Web App, Execute as: Me, Who has access: Anyone
 
-   The web-app URL ends in /exec — paste that into TradeOS
-   Settings → API & Sync → Endpoint URL.
+   Setup:
+     1. Bind this script to the spreadsheet that hosts your three sheets.
+        (Apps Script editor → Project Settings → Script properties is
+         NOT used — we use the BOUND spreadsheet of the script.)
+        Easiest path: open your sheet → Extensions → Apps Script → paste this.
+     2. Sheet names must be exactly:  Holdings  ·  Watchlist  ·  Journal
+     3. First row of each sheet is a HEADER ROW (column names).
+     4. Deploy → New deployment → Web app → Execute as: Me → Access: Anyone.
+     5. Paste the /exec URL into TradeOS · Settings · API & Sync.
+
+   Expected sheet columns (header row, case-insensitive — aliases handled
+   client-side in js/sheets.js):
+
+     Holdings:   symbol  qty  avgCost  lastPrice  currency  name
+     Watchlist:  ticker  priority  risk  catalyst  urgency  note  added
+     Journal:    date  ticker  action  reason  emotion  lesson
+
+   Extra columns are ignored. Missing optional columns are tolerated.
 
    CORS NOTE:
-   The TradeOS client POSTs with Content-Type: text/plain so the
-   browser treats it as a "simple" CORS request — no OPTIONS
-   preflight needed (GAS doesn't handle preflight cleanly).
-   The body is JSON — we parse e.postData.contents ourselves.
+   The TradeOS client POSTs with Content-Type: text/plain so the browser
+   treats it as a "simple" CORS request — no OPTIONS preflight (GAS
+   doesn't handle preflight cleanly). Body is JSON — parsed below.
 
    Wire format (request):
      { action: string, payload?: object, key?: string, ts?: number }
@@ -18,22 +33,26 @@
      { ok: false, error: string }
    ============================================================ */
 
-// Optional shared secret — if non-empty, requests must include
-// the same value in body.key. Leave '' to disable.
+// Optional shared secret. If non-empty, every request must include `key`.
 var API_KEY = '';
 
-// Phase 1: only 'ping' is wired. Add more actions here as TradeOS
-// phases land. Each handler receives the parsed payload object.
-var HANDLERS = {
-  ping: function (payload) {
-    return {
-      ts: new Date().toISOString(),
-      version: 'v4.0.0',
-      server: 'google-apps-script',
-    };
-  },
-  // Phase 2 will add: 'holdings.list', 'holdings.upsert', 'journal.append', ...
+// Sheet name configuration — change these if your tabs are named differently.
+var SHEETS = {
+  holdings:  'Holdings',
+  watchlist: 'Watchlist',
+  journal:   'Journal',
 };
+
+var HANDLERS = {
+  ping: function () {
+    return { ts: new Date().toISOString(), version: 'v4.0.0', server: 'gas' };
+  },
+  'holdings.list':  function () { return readSheet(SHEETS.holdings);  },
+  'watchlist.list': function () { return readSheet(SHEETS.watchlist); },
+  'journal.list':   function () { return readSheet(SHEETS.journal);   },
+};
+
+// --- Entry points ---
 
 function doPost(e) {
   try {
@@ -58,12 +77,42 @@ function doPost(e) {
   }
 }
 
-// doGet so visiting the URL in a browser shows a friendly status page
-// instead of an opaque error during deployment testing.
 function doGet(e) {
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, data: { status: 'TradeOS API up', ts: new Date().toISOString() } }))
-    .setMimeType(ContentService.MimeType.JSON);
+  return _respond({ ok: true, data: { status: 'TradeOS API up', ts: new Date().toISOString() } });
+}
+
+// --- Helpers ---
+
+/**
+ * Read a sheet by name and return an array of plain objects, keyed by header
+ * row. Empty rows (no values at all) are skipped. Date columns are normalized
+ * to ISO strings; Number/Boolean values pass through.
+ */
+function readSheet(name) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('No bound spreadsheet — bind this script to a sheet via Extensions → Apps Script');
+  var sh = ss.getSheetByName(name);
+  if (!sh) throw new Error('Sheet not found: ' + name);
+
+  var values = sh.getDataRange().getValues();
+  if (!values || values.length < 2) return [];
+
+  var headers = values[0].map(function (h) { return String(h || '').trim(); });
+  var rows = [];
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (row.every(function (v) { return v === '' || v === null; })) continue;
+    var o = {};
+    for (var c = 0; c < headers.length; c++) {
+      var key = headers[c];
+      if (!key) continue;
+      var val = row[c];
+      if (val instanceof Date) val = val.toISOString();
+      o[key] = val;
+    }
+    rows.push(o);
+  }
+  return rows;
 }
 
 function _respond(obj) {

@@ -10,7 +10,9 @@ import { setLang, applyI18n }     from './i18n.js';
 import * as Auth                  from './auth.js';
 import * as Sync                  from './sync.js';
 import * as Router                from './router.js';
-import * as State                 from './state.js';
+import * as Holdings              from './stores/holdings.js';
+import * as Watchlist             from './stores/watchlist.js';
+import * as Journal               from './stores/journal.js';
 import { toast }                  from './toast.js';
 import { mountSidebar }           from '../components/sidebar.js';
 import { mountTopbar }            from '../components/topbar.js';
@@ -57,8 +59,12 @@ async function bootstrap() {
   //    - returning user: enter-PIN flow
   await Auth.showLock();
 
-  // 4. Load holdings from storage (recomputes derived fields)
-  State.init();
+  // 4. Init stores (load from local cache + register sync handlers)
+  //    Order matters: stores must register before Sync.start() runs the
+  //    first tick, otherwise the first sync won't pull anything.
+  Holdings.init();
+  Watchlist.init();
+  Journal.init();
 
   // 5. Reveal app shell, mount components
   document.getElementById('app').hidden = false;
