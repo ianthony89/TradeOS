@@ -26,6 +26,8 @@ export const KEYS = {
   QUOTES:         `${NS}.quotes`,
   QUOTES_LAST_AT: `${NS}.quotes.lastAt`,
   QUOTES_LAST_OK: `${NS}.quotes.lastOk`,
+  // Phase 5.2 — CSV import audit trail
+  CSV_LAST_IMPORT: `${NS}.csv.lastImport`,
 };
 
 export function getRaw(key) {

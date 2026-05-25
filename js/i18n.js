@@ -117,7 +117,7 @@ export const I18N = {
     us_sess_closed: 'Closed', us_sess_weekend: 'Weekend Closed',
     my_sess_pre: 'Pre-Open', my_sess_morning: 'Morning Session', my_sess_lunch: 'Lunch Break',
     my_sess_afternoon: 'Afternoon Session', my_sess_closed: 'Closed', my_sess_weekend: 'Weekend Closed',
-    mf_all: 'ALL', mf_my: 'MY', mf_us: 'US',
+    mf_all: 'ALL', mf_my: 'MY', mf_us: 'US', mf_hk: 'HK', mf_sg: 'SG',
 
     // ---- Phase 2 — threats, severity, risk score, table, empties ----
     signals: 'signals', signal: 'signal',
@@ -401,6 +401,23 @@ export const I18N = {
     quotes_15m:           'Every 15 min',
     btn_sync_now:         'Sync Now',
     toast_sync_started:   'Sync started…',
+
+    // ---- Phase 5.2 — Data Management + Holdings ----
+    settings_data:          'Data Management',
+    btn_export_snap:        'Export Snapshot (JSON)',
+    btn_import_snap_file:   'Import Snapshot (JSON)',
+    toast_exported:         'Snapshot exported',
+    snapshot_import_ok:     'Snapshot imported successfully',
+    snapshot_import_fail:   'Invalid snapshot file — check the format and try again.',
+    modal_import_snap_title:'Import Snapshot',
+    modal_import_snap_msg:  'Holdings, watchlist, journal and settings will be restored from the snapshot.',
+    modal_import_snap_warn: 'Current data will be REPLACED. This cannot be undone.',
+    modal_reset_title:      'Reset Everything',
+    modal_reset_msg:        'All local data will be permanently erased — PIN, holdings, watchlist, journal, settings, and API config.',
+    modal_reset_warn:       'This cannot be undone. You will need to set a new PIN after reset.',
+    modal_reset_btn:        'Erase & Restart',
+    toast_reset_done:       'Data cleared. Restarting…',
+    holdings_last_import_pre: 'Last import:',
   },
 
   zh: {
@@ -509,7 +526,7 @@ export const I18N = {
     us_sess_closed: '休市', us_sess_weekend: '周末休市',
     my_sess_pre: '开盘前', my_sess_morning: '早市', my_sess_lunch: '午休',
     my_sess_afternoon: '午市', my_sess_closed: '休市', my_sess_weekend: '周末休市',
-    mf_all: '全部', mf_my: '马股', mf_us: '美股',
+    mf_all: '全部', mf_my: '马股', mf_us: '美股', mf_hk: '港股', mf_sg: '新股',
 
     // ---- Phase 2 ----
     signals: '条信号', signal: '条信号',
@@ -785,6 +802,23 @@ export const I18N = {
     quotes_15m:           '每15分钟',
     btn_sync_now:         '立即同步',
     toast_sync_started:   '同步中…',
+
+    // ---- Phase 5.2 — 数据管理 + 持仓 ----
+    settings_data:          '数据管理',
+    btn_export_snap:        '导出快照 (JSON)',
+    btn_import_snap_file:   '导入快照 (JSON)',
+    toast_exported:         '快照已导出',
+    snapshot_import_ok:     '快照导入成功',
+    snapshot_import_fail:   '无效的快照文件，请检查格式后重试。',
+    modal_import_snap_title:'导入快照',
+    modal_import_snap_msg:  '将从快照恢复持仓、自选股、日志和设置。',
+    modal_import_snap_warn: '当前数据将被替换，此操作无法撤销。',
+    modal_reset_title:      '重置全部数据',
+    modal_reset_msg:        '所有本地数据将被永久清除 — 包括 PIN、持仓、自选股、日志、设置及 API 配置。',
+    modal_reset_warn:       '此操作无法撤销。重置后需重新设置 PIN。',
+    modal_reset_btn:        '清除并重启',
+    toast_reset_done:       '数据已清除，正在重启…',
+    holdings_last_import_pre: '上次导入:',
   },
 };
 

@@ -40,6 +40,8 @@ export function mount(root) {
         <div class="mf" data-f="ALL">${t('mf_all')}</div>
         <div class="mf" data-f="US">${t('mf_us')}</div>
         <div class="mf" data-f="MY">${t('mf_my')}</div>
+        <div class="mf" data-f="HK">${t('mf_hk')}</div>
+        <div class="mf" data-f="SG">${t('mf_sg')}</div>
       </div>
       <div class="hstack">
         <span id="dashQuotesPill" class="pill" data-state="idle" title=""><span class="dot"></span><span class="lbl">${t('quotes_idle')}</span></span>

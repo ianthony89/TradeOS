@@ -8,12 +8,16 @@
    ============================================================ */
 
 import { t, applyI18n, setLang, getLang } from '../js/i18n.js';
-import { getSettings, saveSettings }       from '../js/storage.js';
-import * as Auth   from '../js/auth.js';
-import * as Api    from '../js/api.js';
-import * as Sync   from '../js/sync.js';
-import * as Quotes from '../js/quotes.js';
-import { toast }   from '../js/toast.js';
+import { getSettings, saveSettings, wipeAll } from '../js/storage.js';
+import * as Auth     from '../js/auth.js';
+import * as Api      from '../js/api.js';
+import * as Sync     from '../js/sync.js';
+import * as Quotes   from '../js/quotes.js';
+import * as Holdings from '../js/stores/holdings.js';
+import * as Watchlist from '../js/stores/watchlist.js';
+import * as Journal   from '../js/stores/journal.js';
+import { Modal }     from '../components/modal.js';
+import { toast }     from '../js/toast.js';
 
 const APP_VERSION = 'v4.0.0';
 
@@ -130,6 +134,25 @@ export function mount(root) {
       </div>
     </div>
 
+    <!-- Data Management -->
+    <div class="panel">
+      <div class="panel-head">
+        <h3 data-i18n="settings_data">${t('settings_data')}</h3>
+      </div>
+      <div class="panel-body">
+        <div class="form-row">
+          <div class="form-grid-2">
+            <button class="btn" id="btnExportSnap" data-i18n="btn_export_snap">${t('btn_export_snap')}</button>
+            <button class="btn" id="btnImportSnapTrigger" data-i18n="btn_import_snap_file">${t('btn_import_snap_file')}</button>
+            <input type="file" id="snapFile" accept=".json" style="display:none"/>
+          </div>
+          <div>
+            <button class="btn danger ghost" id="btnResetAll" data-i18n="modal_reset_btn">${t('modal_reset_btn')}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- About -->
     <div class="panel">
       <div class="panel-head">
@@ -224,6 +247,103 @@ function _bind(root) {
     inlineEl.textContent = snap.state;
     inlineEl.dataset.state = snap.state;
   });
+
+  // Data Management — Export Snapshot
+  root.querySelector('#btnExportSnap').addEventListener('click', _exportSnapshot);
+
+  // Data Management — Import Snapshot
+  root.querySelector('#btnImportSnapTrigger').addEventListener('click', () => {
+    root.querySelector('#snapFile').click();
+  });
+  root.querySelector('#snapFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    _importSnapshot(file);
+    e.target.value = '';
+  });
+
+  // Data Management — Reset Everything
+  root.querySelector('#btnResetAll').addEventListener('click', _resetAll);
+}
+
+/* ---------- Data Management ---------- */
+
+function _exportSnapshot() {
+  const snap = {
+    version:    'tradeos.v4',
+    exportedAt: new Date().toISOString(),
+    holdings:   Holdings.getRaw(),
+    watchlist:  Watchlist.getAll(),
+    journal:    Journal.getAll(),
+    settings:   getSettings(),
+  };
+  const blob = new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {
+    href: url,
+    download: `tradeos-snapshot-${new Date().toISOString().slice(0, 10)}.json`,
+  });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(t('toast_exported'), 'success');
+}
+
+async function _importSnapshot(file) {
+  let snap;
+  try {
+    const text = await file.text();
+    snap = JSON.parse(text);
+  } catch (e) {
+    toast(t('snapshot_import_fail'), 'error', 5000);
+    return;
+  }
+
+  if (!snap || snap.version !== 'tradeos.v4') {
+    toast(t('snapshot_import_fail'), 'error', 5000);
+    return;
+  }
+
+  // Build a readable summary of what will be restored
+  const parts = [];
+  if (Array.isArray(snap.holdings)  && snap.holdings.length)  parts.push(`${snap.holdings.length} holdings`);
+  if (Array.isArray(snap.watchlist) && snap.watchlist.length) parts.push(`${snap.watchlist.length} watchlist`);
+  if (Array.isArray(snap.journal)   && snap.journal.length)   parts.push(`${snap.journal.length} journal entries`);
+  if (snap.settings) parts.push('settings');
+  const summary = parts.length ? parts.join(', ') : 'empty snapshot';
+
+  const ok = await Modal.confirm({
+    title:        t('modal_import_snap_title'),
+    message:      `${t('modal_import_snap_msg')}<br><br><span class="muted">${escapeAttr(summary)}</span>`,
+    warning:      t('modal_import_snap_warn'),
+    confirmLabel: t('btn_import_snap_file'),
+    cancelLabel:  t('cancel'),
+  });
+  if (!ok) return;
+
+  if (Array.isArray(snap.holdings))  Holdings.setHoldings(snap.holdings);
+  if (Array.isArray(snap.watchlist)) Watchlist.setAll(snap.watchlist);
+  if (Array.isArray(snap.journal))   Journal.setAll(snap.journal);
+  if (snap.settings)                 saveSettings(snap.settings);
+
+  toast(t('snapshot_import_ok'), 'success', 4000);
+}
+
+async function _resetAll() {
+  const ok = await Modal.confirm({
+    title:        t('modal_reset_title'),
+    message:      t('modal_reset_msg'),
+    warning:      t('modal_reset_warn'),
+    confirmLabel: t('modal_reset_btn'),
+    cancelLabel:  t('cancel'),
+  });
+  if (!ok) return;
+  toast(t('toast_reset_done'), 'info', 2000);
+  setTimeout(() => {
+    wipeAll();
+    location.reload();
+  }, 400);
 }
 
 function escapeAttr(s) {

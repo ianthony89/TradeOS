@@ -5,7 +5,7 @@
    ============================================================ */
 
 import { t, applyI18n } from '../js/i18n.js';
-import { getSettings } from '../js/storage.js';
+import { getSettings, KEYS, getRaw as storageGetRaw } from '../js/storage.js';
 import * as Holdings from '../js/stores/holdings.js';
 import * as Quotes   from '../js/quotes.js';
 import * as Api from '../js/api.js';
@@ -31,7 +31,10 @@ export function mount(root) {
   root.innerHTML = `
     <div class="panel">
       <div class="panel-head">
-        <h3 data-i18n="holdings_title">${t('holdings_title')}</h3>
+        <div>
+          <h3 data-i18n="holdings_title">${t('holdings_title')}</h3>
+          <span class="muted" id="hLastImport" style="font-size:11px;"></span>
+        </div>
         <div class="toolbar">
           <input type="text" class="input-sm" id="hSearch" placeholder="${escapeHtml(t('filter_ticker'))}" value="${escapeHtml(_search)}"/>
           <select id="hRisk" class="input-sm">
@@ -97,6 +100,7 @@ export function mount(root) {
   applyI18n(root);
   _bind(root);
   _renderTable(root);
+  _renderLastImport(root);
   _stateUnsub  = Holdings.onChange(() => _renderTable(root));
   _syncUnmount = mountSyncButton(root.querySelector('#hSyncBtn'));
 }
@@ -340,7 +344,9 @@ async function _doImport(rows, broker = 'CSV') {
   // that reads an empty/partial sheet will be blocked by the guard in
   // stores/holdings.js and will NOT overwrite the freshly imported data.
   Holdings.setHoldings(normalized);
-  try { localStorage.setItem('tradeos.v4.csv.lastImport', new Date().toISOString()); } catch (e) { /* noop */ }
+  try {
+    localStorage.setItem(KEYS.CSV_LAST_IMPORT, JSON.stringify({ broker, at: new Date().toISOString() }));
+  } catch (e) { /* noop */ }
 
   // If API is configured, push to Google Sheet (fire and forget toast)
   if (Api.isConfigured()) {
@@ -357,6 +363,32 @@ async function _doImport(rows, broker = 'CSV') {
   Quotes.runOnce();
 
   toast(t('csv_success_broker', { n: normalized.length, broker }), 'success', 4000);
+}
+
+/* ---------- Last import banner ---------- */
+
+function _renderLastImport(root) {
+  const el = root.querySelector('#hLastImport');
+  if (!el) return;
+  const raw = storageGetRaw(KEYS.CSV_LAST_IMPORT);
+  if (!raw) return;
+  let broker = 'CSV', at = raw;
+  // Support both legacy plain-ISO strings and new JSON format { broker, at }
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.at) { broker = parsed.broker || 'CSV'; at = parsed.at; }
+  } catch (e) { /* plain ISO string — treat as timestamp */ }
+  const when = _agoStr(new Date(at));
+  if (when) el.textContent = `${t('holdings_last_import_pre')} ${broker} · ${when}`;
+}
+
+function _agoStr(date) {
+  if (!date || isNaN(date.getTime())) return '';
+  const s = Math.round((Date.now() - date.getTime()) / 1000);
+  if (s < 60)    return t('sync_just_now');
+  if (s < 3600)  return `${Math.round(s / 60)}m ago`;
+  if (s < 86400) return `${Math.round(s / 3600)}h ago`;
+  return `${Math.round(s / 86400)}d ago`;
 }
 
 /* ---------- Demo data (ported from v3.7 loadSampleData) ---------- */
