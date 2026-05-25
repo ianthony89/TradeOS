@@ -8,6 +8,7 @@
 
 import { KEYS, get, set, remove, getRaw, setRaw, wipeAll, getSettings } from './storage.js';
 import { t } from './i18n.js';
+import { Modal } from '../components/modal.js';
 
 const MIN_LEN = 4;
 const MAX_LEN = 8;
@@ -114,8 +115,13 @@ function _setTitle() {
 function _setMsg(text, isError) {
   els.msg.textContent = text || '';
   els.msg.classList.toggle('error', !!isError);
-  els.wrap.classList.toggle('error', !!isError);
-  if (isError) setTimeout(() => els.wrap.classList.remove('error'), 480);
+  if (isError) {
+    els.wrap.classList.remove('error');          // force re-trigger if already applied
+    // eslint-disable-next-line no-unused-expressions
+    els.wrap.offsetWidth;                        // reflow to restart animation
+    els.wrap.classList.add('error');
+    setTimeout(() => els.wrap.classList.remove('error'), 600);
+  }
 }
 
 function _press(key) {
@@ -126,9 +132,8 @@ function _press(key) {
   _buffer += key;
   _setMsg('');
   _renderDots();
-  if (_buffer.length >= MIN_LEN) {
-    // Auto-submit only when the user has paused (Enter key); to keep flow simple, submit on length === MAX or via Enter.
-  }
+  // Auto-submit immediately when MAX length is reached
+  if (_buffer.length === MAX_LEN) { _submit(); }
 }
 
 async function _submit() {
@@ -177,12 +182,19 @@ function _finishUnlock() {
   }
 }
 
-function _forget() {
-  if (!confirm(t('lock_forget_confirm'))) return;
+async function _forget() {
+  const ok = await Modal.confirm({
+    title:        t('modal_forget_title'),
+    message:      t('lock_forget_confirm'),
+    warning:      t('modal_forget_warn'),
+    confirmLabel: t('modal_forget_btn'),
+    cancelLabel:  t('cancel'),
+  });
+  if (!ok) return;
   wipeAll();
   _firstPin = null;
-  _buffer = '';
-  _mode = 'create';
+  _buffer   = '';
+  _mode     = 'create';
   _setTitle();
   _renderDots();
   _setMsg('');

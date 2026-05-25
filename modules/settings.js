@@ -1,22 +1,43 @@
 /* ============================================================
-   TradeOS v4.0 — settings module (Phase 1 — REAL)
+   TradeOS v4.0 — settings module (Phase 5.1 — sync UX update)
    Surfaces: Security (PIN change, lock-on-hide, lock now),
-             API & Sync (endpoint, key, test, interval),
+             API & Sync (endpoint, key, test, intervals),
              Account & Display (name, theme, language).
+   Phase 5.1: sheet sync + quotes interval are now select dropdowns
+              (OFF/30s/5m for sync; OFF/60s/5m/15m for quotes).
    ============================================================ */
 
 import { t, applyI18n, setLang, getLang } from '../js/i18n.js';
-import { getSettings, saveSettings } from '../js/storage.js';
-import * as Auth from '../js/auth.js';
-import * as Api  from '../js/api.js';
-import * as Sync from '../js/sync.js';
-import { toast } from '../js/toast.js';
+import { getSettings, saveSettings }       from '../js/storage.js';
+import * as Auth   from '../js/auth.js';
+import * as Api    from '../js/api.js';
+import * as Sync   from '../js/sync.js';
+import * as Quotes from '../js/quotes.js';
+import { toast }   from '../js/toast.js';
 
 const APP_VERSION = 'v4.0.0';
 
+// Helper: generate <option> for a select
+function _opt(value, label, selected) {
+  return `<option value="${value}" ${selected ? 'selected' : ''}>${label}</option>`;
+}
+
 export function mount(root) {
-  const s = getSettings();
+  const s   = getSettings();
   const cfg = Api.getConfig();
+
+  const syncOpts = [
+    _opt(0,   t('sync_manual'), s.syncIntervalSec === 0),
+    _opt(30,  t('sync_30s'),    s.syncIntervalSec === 30),
+    _opt(300, t('sync_5m'),     s.syncIntervalSec === 300),
+  ].join('');
+
+  const quotesOpts = [
+    _opt(0,   t('sync_manual'),  s.quotesIntervalSec === 0),
+    _opt(60,  t('quotes_60s'),   s.quotesIntervalSec === 60),
+    _opt(300, t('sync_5m'),      s.quotesIntervalSec === 300),
+    _opt(900, t('quotes_15m'),   s.quotesIntervalSec === 900),
+  ].join('');
 
   root.innerHTML = `
     <!-- Account & display -->
@@ -88,13 +109,20 @@ export function mount(root) {
             <label data-i18n="api_key_label">${t('api_key_label')}</label>
             <input type="password" id="setApiKey" value="${escapeAttr(cfg.key)}" placeholder="${escapeAttr(t('api_key_ph'))}"/>
           </div>
-          <div>
-            <label data-i18n="sync_interval_label">${t('sync_interval_label')}</label>
-            <input type="number" id="setSyncInterval" min="5" max="3600" step="5" value="${s.syncIntervalSec}"/>
+          <div class="form-grid-2">
+            <div>
+              <label data-i18n="sync_settings_label">${t('sync_settings_label')}</label>
+              <select id="setSyncInterval">${syncOpts}</select>
+            </div>
+            <div>
+              <label data-i18n="quotes_settings_label">${t('quotes_settings_label')}</label>
+              <select id="setQuotesInterval">${quotesOpts}</select>
+            </div>
           </div>
           <div class="hstack">
             <button class="btn primary" id="btnSaveApi" data-i18n="api_save_btn">${t('api_save_btn')}</button>
             <button class="btn" id="btnTestApi" data-i18n="api_test_btn">${t('api_test_btn')}</button>
+            <button class="btn" id="btnSyncNow" data-i18n="btn_sync_now">${t('btn_sync_now')}</button>
             <button class="btn danger ghost" id="btnClearApi" data-i18n="api_clear_btn">${t('api_clear_btn')}</button>
             <span id="apiTestMsg" class="muted"></span>
           </div>
@@ -146,21 +174,29 @@ function _bind(root) {
 
   // API & sync
   root.querySelector('#btnSaveApi').addEventListener('click', () => {
-    const endpoint = root.querySelector('#setApiEndpoint').value.trim();
-    const key      = root.querySelector('#setApiKey').value.trim();
-    const interval = Number(root.querySelector('#setSyncInterval').value) || 30;
+    const endpoint      = root.querySelector('#setApiEndpoint').value.trim();
+    const key           = root.querySelector('#setApiKey').value.trim();
+    const syncSec       = Number(root.querySelector('#setSyncInterval').value);
+    const quotesSec     = Number(root.querySelector('#setQuotesInterval').value);
     Api.configure({ endpoint, key });
-    saveSettings({ syncIntervalSec: interval });
-    Sync.setIntervalSec(interval);
+    saveSettings({ syncIntervalSec: syncSec, quotesIntervalSec: quotesSec });
+    Sync.setIntervalSec(syncSec);
+    Quotes.setIntervalSec(quotesSec);
     toast(t('api_saved'), 'success');
-    Sync.runOnce();
   });
+
+  root.querySelector('#btnSyncNow').addEventListener('click', () => {
+    Sync.runOnce();
+    Quotes.runOnce();
+    toast(t('toast_sync_started'), 'info');
+  });
+
   root.querySelector('#btnTestApi').addEventListener('click', async () => {
     const endpoint = root.querySelector('#setApiEndpoint').value.trim();
     const key      = root.querySelector('#setApiKey').value.trim();
     const msg = root.querySelector('#apiTestMsg');
     if (!endpoint) { msg.textContent = t('api_test_fail', { msg: 'no endpoint' }); msg.classList.add('muted'); return; }
-    // Apply temporarily for the test, then leave it in place — user will Save explicitly.
+    // Apply temporarily for the test
     Api.configure({ endpoint, key });
     msg.textContent = '…';
     try {
@@ -172,6 +208,7 @@ function _bind(root) {
       toast(t('api_test_fail', { msg: e.message || e }), 'error');
     }
   });
+
   root.querySelector('#btnClearApi').addEventListener('click', () => {
     Api.clearConfig();
     root.querySelector('#setApiEndpoint').value = '';

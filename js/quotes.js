@@ -1,18 +1,19 @@
 /* ============================================================
-   TradeOS v4.0 — quotes
-   Live market-price engine. Independent 60-second loop, separate
-   from the 30-second sheet sync — they have different cadences,
-   different failure modes, and different timeout needs.
+   TradeOS v4.0 — quotes (Phase 5.1 — manual mode + visibility)
+   Live market-price engine. Independent configurable-interval loop,
+   separate from the sheet sync — different cadence, different failure
+   modes, different timeout needs.
 
    Data path:
-     Holdings sheet (30s) →  symbol / qty / avgCost / currency
-     Quotes engine (60s)  →  live lastPrice + prevClose + dayChangePct
+     Holdings sheet (sync)  →  symbol / qty / avgCost / currency
+     Quotes engine (poll)   →  live lastPrice + prevClose + dayChangePct
      domain/portfolio.recompute() merges them — live price wins,
      sheet's lastPrice is the graceful fallback when no quote yet.
 
-   On API failure the in-memory + localStorage quote cache is kept,
-   so the dashboard keeps the last good prices and just flags the
-   pill as "error". No fake/demo fallback.
+   Phase 5.1 changes:
+   - Default interval: 5 min (300s); 0 = manual only
+   - Pauses timer when tab hidden; resumes + refresh on tab focus
+   - On API failure, cache is kept — no fake/demo fallback
    ============================================================ */
 
 import * as Api from './api.js';
@@ -34,10 +35,11 @@ let _state     = STATES.IDLE;
 let _lastError = null;
 let _lastAt    = null;
 let _lastOk    = null;
-let _intervalMs = 60_000;
+let _intervalMs = 300_000;    // 5 min default; 0 = manual only
 let _timer = null;
 let _running = false;
 let _netBound = false;
+let _visBound = false;
 let _holdingsUnsub = null;
 
 /* ---------- Public ---------- */
@@ -108,6 +110,24 @@ function _bindNetwork() {
   });
 }
 
+/** Pause timer when tab hidden, resume + refresh when tab visible again. */
+function _bindVisibility() {
+  if (_visBound) return;
+  _visBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      // Pause — clear timer but keep _running flag
+      if (_timer) { window.clearInterval(_timer); _timer = null; }
+    } else {
+      // Resume — restart timer and run immediately
+      if (_running && _intervalMs > 0 && !_timer) {
+        runOnce();
+        _timer = window.setInterval(() => runOnce(), _intervalMs);
+      }
+    }
+  });
+}
+
 /** Run one fetch pass. Safe to call any time. */
 export async function runOnce() {
   if (_state === STATES.FETCHING) return;
@@ -158,15 +178,28 @@ export async function runOnce() {
   }
 }
 
+/**
+ * Set the auto-poll interval.
+ * seconds = 0 → manual only (no auto timer).
+ * Restarts loop if currently running.
+ */
 export function setIntervalSec(seconds) {
-  const s = Math.max(15, Math.min(3600, Number(seconds) || 60));
-  _intervalMs = s * 1000;
-  if (_running) { stop(); start(); }
+  const n = Number(seconds);
+  _intervalMs = (n > 0) ? Math.max(15, Math.min(3600, n)) * 1000 : 0;
+
+  if (!_running) return;
+
+  // Restart timer with new cadence
+  if (_timer) { window.clearInterval(_timer); _timer = null; }
+  if (_intervalMs > 0) {
+    _timer = window.setInterval(() => runOnce(), _intervalMs);
+  }
 }
 
 export function start() {
   if (_running) return;
   _bindNetwork();
+  _bindVisibility();
   _load();
 
   // Re-fetch immediately when a new symbol appears in holdings
@@ -180,7 +213,10 @@ export function start() {
 
   _running = true;
   runOnce();
-  _timer = window.setInterval(() => runOnce(), _intervalMs);
+  // Only start a timer if interval > 0 (non-manual mode)
+  if (_intervalMs > 0) {
+    _timer = window.setInterval(() => runOnce(), _intervalMs);
+  }
 }
 
 export function stop() {

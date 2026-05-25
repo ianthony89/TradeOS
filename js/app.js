@@ -92,12 +92,12 @@ async function bootstrap() {
   _registerRoutes();
   Router.start();
 
-  // 7. Start sheet-sync (default 30s) — pulls Holdings/Watchlist/Journal sheets
-  Sync.setIntervalSec(s.syncIntervalSec || 30);
+  // 7. Start sheet-sync — interval from settings (0 = manual only, no auto-poll)
+  Sync.setIntervalSec(s.syncIntervalSec);
   Sync.start();
 
-  // 8. Start live-quote engine (60s) — pulls prices for current holdings via GAS
-  Quotes.setIntervalSec(s.quotesIntervalSec || 60);
+  // 8. Start live-quote engine — interval from settings (0 = manual; default 300s)
+  Quotes.setIntervalSec(s.quotesIntervalSec);
   Quotes.start();
 }
 

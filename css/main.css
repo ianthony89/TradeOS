@@ -443,7 +443,32 @@ label { display: block; font-size: 11px; letter-spacing: 1.2px; text-transform: 
   display: flex; justify-content: space-between; align-items: center;
 }
 .modal-head h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
-.modal-body { padding: 24px; }
+.modal-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+.modal-body { padding: 20px 24px 0; }
+.modal-msg  { font-size: 14px; line-height: 1.65; color: var(--text-dim); margin: 0; }
+.modal-warn {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  font-size: 13px; line-height: 1.6;
+  color: var(--amber);
+  background: rgba(255,181,71,0.08);
+  border: 1px solid rgba(255,181,71,0.25);
+  border-radius: 10px;
+}
+.modal-foot {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 20px 24px;
+}
+.modal-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .modal-close {
   width: 32px; height: 32px;
   display: grid; place-items: center;

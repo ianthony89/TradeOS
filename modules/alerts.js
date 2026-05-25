@@ -11,6 +11,7 @@ import * as Quotes      from '../js/quotes.js';
 import { isConfigured } from '../js/api.js';
 import { escapeHtml }   from '../js/domain/format.js';
 import { toast }        from '../js/toast.js';
+import { Modal }        from '../components/modal.js';
 
 let _unsub = null;
 let _triggered = null;
@@ -137,8 +138,14 @@ function _bind(root) {
     toast(`${symbol} ${t('alert_created')}`, 'success');
   });
 
-  root.querySelector('#alertClearAll').addEventListener('click', () => {
-    if (!confirm(t('alert_confirm_clear'))) return;
+  root.querySelector('#alertClearAll').addEventListener('click', async () => {
+    const ok = await Modal.confirm({
+      title:        t('modal_alert_clear_title'),
+      message:      t('alert_confirm_clear'),
+      confirmLabel: t('clear_all'),
+      cancelLabel:  t('cancel'),
+    });
+    if (!ok) return;
     AlertsStore.clearAll();
     toast(t('alert_cleared'), 'info');
   });

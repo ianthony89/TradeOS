@@ -15,6 +15,7 @@ import { fmt, escapeHtml } from '../js/domain/format.js';
 import { parseCSV } from '../js/domain/csvparser.js';
 import { toast } from '../js/toast.js';
 import { mountSyncButton } from '../components/sync-button.js';
+import { Modal } from '../components/modal.js';
 
 const STATUSES = ['HEALTHY','WATCH','WEAK','DEAD'];
 
@@ -130,9 +131,15 @@ function _bind(root) {
     _fStatus = e.target.value;
     _renderTable(root);
   });
-  root.querySelector('#hClear').addEventListener('click', () => {
+  root.querySelector('#hClear').addEventListener('click', async () => {
     if (!Holdings.getHoldings().length) return;
-    if (!confirm(t('confirm_clear_holdings'))) return;
+    const ok = await Modal.confirm({
+      title:        t('modal_clear_title'),
+      message:      t('confirm_clear_holdings'),
+      confirmLabel: t('clear_all'),
+      cancelLabel:  t('cancel'),
+    });
+    if (!ok) return;
     Holdings.clearAll();
     toast(t('toast_cleared'), 'info');
   });
@@ -242,10 +249,16 @@ function _renderTable(root) {
   });
   // Per-row remove
   body.querySelectorAll('button[data-remove]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const sym = btn.dataset.remove;
-      if (!confirm(t('confirm_remove_pos', { sym }))) return;
+      const ok = await Modal.confirm({
+        title:        t('modal_remove_title'),
+        message:      t('confirm_remove_pos', { sym }),
+        confirmLabel: t('alert_delete'),
+        cancelLabel:  t('cancel'),
+      });
+      if (!ok) return;
       Holdings.removeHolding(sym);
       toast(`${sym} ${t('toast_removed')}`, 'info');
     });
@@ -256,13 +269,15 @@ function _renderTable(root) {
 
 function _handleCSVFile(root, file) {
   const reader = new FileReader();
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     const text = ev.target.result;
     const { broker, rows, warnings } = parseCSV(text);
 
     if (!rows.length) {
-      toast(t('csv_no_holdings'), 'error', 5000);
-      if (warnings.length) toast(warnings[0], 'warn', 5000);
+      await Modal.alert({
+        title:   t('csv_no_holdings'),
+        message: warnings.length ? `⚠ ${warnings[0]}` : t('csv_no_holdings'),
+      });
       return;
     }
 
@@ -275,27 +290,36 @@ function _handleCSVFile(root, file) {
       dedupedRows.push(r);
     });
 
-    // Confirm dialog
     const existing = Holdings.getRaw().length;
     const dupCount  = rows.length - dedupedRows.length;
-    const lines = [
-      `${t('csv_detected', { broker })}`,
-      `${t('csv_preview_sub', { n: dedupedRows.length })}`,
+
+    const message = [
+      t('csv_detected', { broker }),
+      t('csv_preview_sub', { n: dedupedRows.length }),
+      existing > 0 ? t('csv_replace_warn', { n: existing }) : '',
+    ].filter(Boolean).join('<br>');
+
+    const warnParts = [
       dupCount > 0 ? `⚠ ${t('csv_duplicate_warn', { n: dupCount })}` : null,
       warnings.length ? `⚠ ${warnings[0]}` : null,
-      '',
-      existing > 0 ? t('csv_replace_warn', { n: existing }) : '',
-    ].filter(l => l !== null).join('\n');
+    ].filter(Boolean);
 
-    if (!confirm(`${lines}\n\n${t('csv_import_confirm_q')}`)) return;
+    const ok = await Modal.confirm({
+      title:        t('csv_import_title'),
+      message,
+      warning:      warnParts.length ? warnParts.join('<br>') : null,
+      confirmLabel: t('csv_import_confirm_q'),
+      cancelLabel:  t('cancel'),
+    });
+    if (!ok) return;
 
-    _doImport(dedupedRows);
+    await _doImport(dedupedRows, broker);
   };
   reader.onerror = () => toast(t('csv_read_error'), 'error');
   reader.readAsText(file, 'UTF-8');
 }
 
-async function _doImport(rows) {
+async function _doImport(rows, broker = 'CSV') {
   // Normalize to internal schema
   const normalized = rows.map(r => ({
     symbol:    r.symbol,
@@ -307,16 +331,15 @@ async function _doImport(rows) {
   })).filter(r => r.symbol && r.qty > 0);
 
   if (!normalized.length) {
-    toast(t('csv_no_holdings'), 'error');
+    await Modal.alert({ title: t('csv_no_holdings'), message: '' });
     return;
   }
 
   // If API is configured, write to Google Sheet
   if (Api.isConfigured()) {
+    toast(t('csv_uploading'), 'info');
     try {
-      toast(t('csv_uploading'), 'info');
       await Api.call('csv.import', { rows: normalized }, { timeoutMs: 30000 });
-      toast(t('csv_success', { n: normalized.length }), 'success', 4000);
     } catch (e) {
       toast(t('csv_upload_error', { msg: e.message }), 'error', 6000);
       // Still update local state even if remote write failed
@@ -332,9 +355,7 @@ async function _doImport(rows) {
   // Refresh quotes for the newly imported symbols
   Quotes.runOnce();
 
-  if (!Api.isConfigured()) {
-    toast(t('csv_success', { n: normalized.length }), 'success', 4000);
-  }
+  toast(t('csv_success_broker', { n: normalized.length, broker }), 'success', 4000);
 }
 
 /* ---------- Demo data (ported from v3.7 loadSampleData) ---------- */

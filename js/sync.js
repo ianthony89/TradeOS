@@ -1,12 +1,15 @@
 /* ============================================================
-   TradeOS v4.0 — sync engine
-   Runs every N seconds (default 30). On each tick:
+   TradeOS v4.0 — sync engine (Phase 5.1 — stability + visibility)
+   Runs on configurable interval (default: manual / 0 = no auto-poll).
+   On each tick:
      1. ping the API
      2. invoke every registered sync handler in sequence
    Emits state events so the topbar pill stays current.
 
-   Phase 1: only the ping handler is exercised. Phase 2+ modules
-   can register their own handlers via sync.register('holdings', fn).
+   Phase 5.1 changes:
+   - intervalSec = 0 means manual-only (no auto timer)
+   - Pauses timer when tab is hidden; resumes + runOnce on tab focus
+   - Module handlers validate payload before overwriting store state
    ============================================================ */
 
 import { KEYS, get, set } from './storage.js';
@@ -26,11 +29,12 @@ let _state = STATES.IDLE;
 let _lastError = null;
 let _lastAt = get(KEYS.SYNC_LAST_AT, null);
 let _lastOk = get(KEYS.SYNC_LAST_OK, null);
-let _intervalMs = 30000;
+let _intervalMs = 0;          // 0 = manual only
 let _timer = null;
 let _running = false;
 let _authUnsubscribe = null;
 let _netBound = false;
+let _visBound = false;
 
 const _handlers = new Map();      // name -> async fn
 const _listeners = new Set();     // (snapshot) => void
@@ -79,6 +83,24 @@ function _bindNetwork() {
   });
 }
 
+/** Pause timer when tab hidden, resume + refresh when tab visible again. */
+function _bindVisibility() {
+  if (_visBound) return;
+  _visBound = true;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      // Pause — clear timer but keep _running flag
+      if (_timer) { window.clearInterval(_timer); _timer = null; }
+    } else {
+      // Resume — restart timer and run immediately
+      if (_running && _intervalMs > 0 && !_timer) {
+        runOnce();
+        _timer = window.setInterval(() => runOnce(), _intervalMs);
+      }
+    }
+  });
+}
+
 /** One sync pass. Safe to call manually. Skips if locked or already running. */
 export async function runOnce() {
   if (Auth.isLocked()) return;
@@ -105,16 +127,28 @@ export async function runOnce() {
   }
 }
 
-/** Update tick interval (seconds). Min 5s, max 1h. Restarts loop if running. */
+/**
+ * Set the auto-poll interval.
+ * seconds = 0 → manual only (no auto timer).
+ * Restarts loop if currently running.
+ */
 export function setIntervalSec(seconds) {
-  const s = Math.max(5, Math.min(3600, Number(seconds) || 30));
-  _intervalMs = s * 1000;
-  if (_running) { stop(); start(); }
+  const n = Number(seconds);
+  _intervalMs = (n > 0) ? Math.max(5, Math.min(3600, n)) * 1000 : 0;
+
+  if (!_running) return;
+
+  // Restart timer with new cadence
+  if (_timer) { window.clearInterval(_timer); _timer = null; }
+  if (_intervalMs > 0) {
+    _timer = window.setInterval(() => runOnce(), _intervalMs);
+  }
 }
 
 export function start() {
   if (_running) return;
   _bindNetwork();
+  _bindVisibility();
 
   if (!_authUnsubscribe) {
     _authUnsubscribe = Auth.onChange((locked) => {
@@ -125,9 +159,10 @@ export function start() {
 
   _running = true;
   runOnce();
-  // Use window.setInterval explicitly — module exports do NOT shadow globals,
-  // but being explicit makes intent obvious.
-  _timer = window.setInterval(() => runOnce(), _intervalMs);
+  // Only start a timer if interval > 0 (non-manual mode)
+  if (_intervalMs > 0) {
+    _timer = window.setInterval(() => runOnce(), _intervalMs);
+  }
 }
 
 export function stop() {

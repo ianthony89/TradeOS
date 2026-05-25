@@ -75,8 +75,8 @@ export const DEFAULT_SETTINGS = {
   name: 'Trader',
   lang: 'en',
   theme: 'dark',
-  syncIntervalSec: 30,
-  quotesIntervalSec: 60,
+  syncIntervalSec: 0,       // 0 = manual only (no auto-poll)
+  quotesIntervalSec: 300,   // 5 min default
   lockOnHide: false,
   // Phase 2 — portfolio / risk
   cash: 0,
