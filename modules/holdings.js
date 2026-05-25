@@ -7,11 +7,12 @@
 import { t, applyI18n } from '../js/i18n.js';
 import { getSettings } from '../js/storage.js';
 import * as Holdings from '../js/stores/holdings.js';
-import * as Sync from '../js/sync.js';
-import { isConfigured } from '../js/api.js';
+import * as Quotes   from '../js/quotes.js';
+import * as Api from '../js/api.js';
 import { applyMarketFilter } from '../js/domain/portfolio.js';
 import { classifyRisk, RISK_CLASSES } from '../js/domain/risk.js';
 import { fmt, escapeHtml } from '../js/domain/format.js';
+import { parseCSV } from '../js/domain/csvparser.js';
 import { toast } from '../js/toast.js';
 import { mountSyncButton } from '../components/sync-button.js';
 
@@ -40,6 +41,8 @@ export function mount(root) {
             <option value="">${t('filter_all_status')}</option>
             ${STATUSES.map(s => `<option ${_fStatus === s ? 'selected' : ''}>${s}</option>`).join('')}
           </select>
+          <button class="btn sm primary" id="hCSVImport" data-i18n="csv_import_btn">${t('csv_import_btn')}</button>
+          <input type="file" id="hCSVFile" accept=".csv,.txt" style="display:none"/>
           <button class="btn sm ghost danger" id="hClear" data-i18n="clear_all">${t('clear_all')}</button>
           <span id="hSyncBtn"></span>
         </div>
@@ -50,7 +53,7 @@ export function mount(root) {
     <div class="panel">
       <div class="panel-head">
         <h3 data-i18n="btn_manual">${t('btn_manual')}</h3>
-        ${isConfigured() ? '' : `<button class="btn sm" id="hDemo" data-i18n="btn_demo">${t('btn_demo')}</button>`}
+        ${Api.isConfigured() ? '' : `<button class="btn sm" id="hDemo" data-i18n="btn_demo">${t('btn_demo')}</button>`}
       </div>
       <div class="panel-body">
         <div class="form-row">
@@ -104,6 +107,17 @@ export function unmount(root) {
 }
 
 function _bind(root) {
+  // CSV Import button → trigger hidden file input
+  root.querySelector('#hCSVImport').addEventListener('click', () => {
+    root.querySelector('#hCSVFile').click();
+  });
+  root.querySelector('#hCSVFile').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    _handleCSVFile(root, file);
+    e.target.value = ''; // reset so same file can be re-selected
+  });
+
   root.querySelector('#hSearch').addEventListener('input', (e) => {
     _search = e.target.value.toUpperCase();
     _renderTable(root);
@@ -236,6 +250,91 @@ function _renderTable(root) {
       toast(`${sym} ${t('toast_removed')}`, 'info');
     });
   });
+}
+
+/* ---------- CSV Import ---------- */
+
+function _handleCSVFile(root, file) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const text = ev.target.result;
+    const { broker, rows, warnings } = parseCSV(text);
+
+    if (!rows.length) {
+      toast(t('csv_no_holdings'), 'error', 5000);
+      if (warnings.length) toast(warnings[0], 'warn', 5000);
+      return;
+    }
+
+    // Check for duplicates within the import
+    const seen = new Set();
+    const dedupedRows = [];
+    rows.forEach(r => {
+      if (seen.has(r.symbol)) return;
+      seen.add(r.symbol);
+      dedupedRows.push(r);
+    });
+
+    // Confirm dialog
+    const existing = Holdings.getRaw().length;
+    const dupCount  = rows.length - dedupedRows.length;
+    const lines = [
+      `${t('csv_detected', { broker })}`,
+      `${t('csv_preview_sub', { n: dedupedRows.length })}`,
+      dupCount > 0 ? `⚠ ${t('csv_duplicate_warn', { n: dupCount })}` : null,
+      warnings.length ? `⚠ ${warnings[0]}` : null,
+      '',
+      existing > 0 ? t('csv_replace_warn', { n: existing }) : '',
+    ].filter(l => l !== null).join('\n');
+
+    if (!confirm(`${lines}\n\n${t('csv_import_confirm_q')}`)) return;
+
+    _doImport(dedupedRows);
+  };
+  reader.onerror = () => toast(t('csv_read_error'), 'error');
+  reader.readAsText(file, 'UTF-8');
+}
+
+async function _doImport(rows) {
+  // Normalize to internal schema
+  const normalized = rows.map(r => ({
+    symbol:    r.symbol,
+    qty:       r.qty,
+    avgCost:   r.avgCost,
+    lastPrice: r.lastPrice,
+    currency:  r.currency || 'USD',
+    name:      r.name || '',
+  })).filter(r => r.symbol && r.qty > 0);
+
+  if (!normalized.length) {
+    toast(t('csv_no_holdings'), 'error');
+    return;
+  }
+
+  // If API is configured, write to Google Sheet
+  if (Api.isConfigured()) {
+    try {
+      toast(t('csv_uploading'), 'info');
+      await Api.call('csv.import', { rows: normalized }, { timeoutMs: 30000 });
+      toast(t('csv_success', { n: normalized.length }), 'success', 4000);
+    } catch (e) {
+      toast(t('csv_upload_error', { msg: e.message }), 'error', 6000);
+      // Still update local state even if remote write failed
+    }
+  }
+
+  // Always update local store
+  Holdings.setHoldings(normalized);
+
+  // Persist import timestamp
+  try { localStorage.setItem('tradeos.v4.csv.lastImport', new Date().toISOString()); } catch (e) { /* noop */ }
+
+  // Refresh quotes for the newly imported symbols
+  Quotes.runOnce();
+
+  if (!Api.isConfigured()) {
+    toast(t('csv_success', { n: normalized.length }), 'success', 4000);
+  }
 }
 
 /* ---------- Demo data (ported from v3.7 loadSampleData) ---------- */

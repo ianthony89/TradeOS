@@ -43,6 +43,9 @@ var SHEETS = {
   journal:   'Journal',
 };
 
+// Alert sheet name — created automatically if missing.
+var SHEETS_ALERTS = 'Alerts';
+
 var HANDLERS = {
   ping: function () {
     return { ts: new Date().toISOString(), version: 'v4.0.0', server: 'gas' };
@@ -51,6 +54,11 @@ var HANDLERS = {
   'watchlist.list': function ()        { return readSheet(SHEETS.watchlist); },
   'journal.list':   function ()        { return readSheet(SHEETS.journal);   },
   'quotes.fetch':   function (payload) { return fetchQuotes(payload || {});  },
+  // Phase 5
+  'csv.import':     function (payload) { return importHoldingsCSV(payload || {}); },
+  'alerts.list':    function ()        { return listAlerts();   },
+  'alerts.save':    function (payload) { return saveAlert(payload || {}); },
+  'alerts.delete':  function (payload) { return deleteAlert(payload || {}); },
 };
 
 // --- Entry points ---
@@ -268,4 +276,146 @@ function _fetchFinnhubQuote(canonical, token) {
     ts:        j.t ? j.t * 1000 : Date.now(),
     source:    'finnhub',
   };
+}
+
+/* ============================================================
+   PHASE 5 — CSV IMPORT
+   Receives an array of { symbol, qty, avgCost, lastPrice,
+   currency, name } objects and writes them to the Holdings
+   sheet, preserving the header row.
+   ============================================================ */
+
+function importHoldingsCSV(payload) {
+  var rows = payload && Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rows.length) throw new Error('csv.import: no rows provided');
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('No bound spreadsheet');
+  var sh = ss.getSheetByName(SHEETS.holdings);
+  if (!sh) throw new Error('Sheet not found: ' + SHEETS.holdings);
+
+  // Read existing header row (row 1) so we don't destroy it
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (!headers || !headers.length || !headers[0]) {
+    // Write a canonical header if the sheet is completely empty
+    headers = ['symbol', 'qty', 'avgCost', 'lastPrice', 'currency', 'name'];
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  }
+
+  // Clear all data rows (keep header)
+  var lastRow = sh.getLastRow();
+  if (lastRow > 1) sh.getRange(2, 1, lastRow - 1, sh.getLastColumn()).clearContent();
+
+  // Map our canonical fields to the header positions
+  var lowerHeaders = headers.map(function (h) { return String(h || '').toLowerCase().trim(); });
+  var fieldToCol = {
+    symbol: _headerIdx(lowerHeaders, ['symbol','ticker','代码']),
+    qty:    _headerIdx(lowerHeaders, ['qty','quantity','shares','数量','持有数量']),
+    avgcost:_headerIdx(lowerHeaders, ['avgcost','avg cost','average cost','平均成本价','成本价']),
+    lastprice:_headerIdx(lowerHeaders, ['lastprice','last price','price','现价','最新价']),
+    currency: _headerIdx(lowerHeaders, ['currency','ccy','币种']),
+    name:   _headerIdx(lowerHeaders, ['name','company','名称','股票名称']),
+  };
+
+  // Build data rows in header column order
+  var dataRows = rows.map(function (r) {
+    var row = new Array(headers.length).fill('');
+    function _set(field, val) { var c = fieldToCol[field]; if (c >= 0) row[c] = val; }
+    _set('symbol',    r.symbol || '');
+    _set('qty',       r.qty    || 0);
+    _set('avgcost',   r.avgCost || 0);
+    _set('lastprice', r.lastPrice || 0);
+    _set('currency',  r.currency || 'USD');
+    _set('name',      r.name || '');
+    return row;
+  });
+
+  if (dataRows.length) {
+    sh.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
+  }
+
+  return { imported: dataRows.length, sheet: SHEETS.holdings };
+}
+
+function _headerIdx(lowerHeaders, candidates) {
+  for (var i = 0; i < candidates.length; i++) {
+    var idx = lowerHeaders.indexOf(candidates[i].toLowerCase());
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+/* ============================================================
+   PHASE 5 — ALERTS (Alerts sheet)
+   Auto-creates the Alerts tab if missing.
+   Schema: id | symbol | condition | target | status |
+           created_at | triggered_at | notes
+   ============================================================ */
+
+var ALERTS_HEADERS = ['id','symbol','condition','target','status','created_at','triggered_at','notes'];
+
+function _getOrCreateAlertsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (!ss) throw new Error('No bound spreadsheet');
+  var sh = ss.getSheetByName(SHEETS_ALERTS);
+  if (!sh) {
+    sh = ss.insertSheet(SHEETS_ALERTS);
+    sh.getRange(1, 1, 1, ALERTS_HEADERS.length).setValues([ALERTS_HEADERS]);
+  }
+  return sh;
+}
+
+function listAlerts() {
+  var sh = _getOrCreateAlertsSheet();
+  var vals = sh.getDataRange().getValues();
+  if (!vals || vals.length < 2) return [];
+  var headers = vals[0].map(function (h) { return String(h || '').toLowerCase().trim(); });
+  return vals.slice(1).filter(function (r) { return r[0]; }).map(function (r) {
+    var o = {};
+    headers.forEach(function (h, i) { o[h] = r[i]; });
+    return o;
+  });
+}
+
+function saveAlert(payload) {
+  // Upsert by id. If no matching id, append a new row.
+  if (!payload || !payload.id) throw new Error('alerts.save: missing id');
+  var sh = _getOrCreateAlertsSheet();
+  var vals = sh.getDataRange().getValues();
+  var headers = vals[0].map(function (h) { return String(h || '').toLowerCase().trim(); });
+  var idCol = headers.indexOf('id');
+  if (idCol < 0) throw new Error('Alerts sheet missing id column');
+
+  // Build row array from payload
+  var row = ALERTS_HEADERS.map(function (h) {
+    return payload[h] !== undefined ? String(payload[h]) : '';
+  });
+
+  // Look for existing row
+  for (var r = 1; r < vals.length; r++) {
+    if (String(vals[r][idCol]) === String(payload.id)) {
+      sh.getRange(r + 1, 1, 1, row.length).setValues([row]);
+      return { saved: true, row: r + 1 };
+    }
+  }
+  // Append new row
+  sh.appendRow(row);
+  return { saved: true, row: sh.getLastRow() };
+}
+
+function deleteAlert(payload) {
+  if (!payload || !payload.id) throw new Error('alerts.delete: missing id');
+  var sh = _getOrCreateAlertsSheet();
+  var vals = sh.getDataRange().getValues();
+  var headers = vals[0].map(function (h) { return String(h || '').toLowerCase().trim(); });
+  var idCol = headers.indexOf('id');
+  if (idCol < 0) throw new Error('Alerts sheet missing id column');
+
+  for (var r = 1; r < vals.length; r++) {
+    if (String(vals[r][idCol]) === String(payload.id)) {
+      sh.deleteRow(r + 1);
+      return { deleted: true };
+    }
+  }
+  return { deleted: false };
 }

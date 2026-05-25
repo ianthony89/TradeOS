@@ -19,18 +19,22 @@ import { toast }                  from './toast.js';
 import * as HoldingsStore  from './stores/holdings.js';
 import * as WatchlistStore from './stores/watchlist.js';
 import * as JournalStore   from './stores/journal.js';
+import * as AlertsStore    from './stores/alerts.js';
 
 // Shell components
 import { mountSidebar }    from '../components/sidebar.js';
 import { mountTopbar }     from '../components/topbar.js';
 
 // Route modules (UI pages)
-import * as DashboardPage from '../modules/dashboard.js';
-import * as HoldingsPage  from '../modules/holdings.js';
-import * as WatchlistPage from '../modules/watchlist.js';
-import * as JournalPage   from '../modules/journal.js';
-import * as AiPage        from '../modules/ai.js';
-import * as SettingsPage  from '../modules/settings.js';
+import * as DashboardPage   from '../modules/dashboard.js';
+import * as HoldingsPage    from '../modules/holdings.js';
+import * as WatchlistPage   from '../modules/watchlist.js';
+import * as JournalPage     from '../modules/journal.js';
+import * as PerformancePage from '../modules/performance.js';
+import * as AlertsPage      from '../modules/alerts.js';
+import * as PlannerPage     from '../modules/planner.js';
+import * as AiPage          from '../modules/ai.js';
+import * as SettingsPage    from '../modules/settings.js';
 
 /* ---------- Route registration ---------- */
 
@@ -42,12 +46,15 @@ function _registerRoutes() {
     unmount: () => mod.unmount(stage),
   });
 
-  Router.register('dashboard', make(DashboardPage));
-  Router.register('holdings',  make(HoldingsPage));
-  Router.register('watchlist', make(WatchlistPage));
-  Router.register('journal',   make(JournalPage));
-  Router.register('ai',        make(AiPage));
-  Router.register('settings',  make(SettingsPage));
+  Router.register('dashboard',   make(DashboardPage));
+  Router.register('holdings',    make(HoldingsPage));
+  Router.register('watchlist',   make(WatchlistPage));
+  Router.register('journal',     make(JournalPage));
+  Router.register('performance', make(PerformancePage));
+  Router.register('alerts',      make(AlertsPage));
+  Router.register('planner',     make(PlannerPage));
+  Router.register('ai',          make(AiPage));
+  Router.register('settings',    make(SettingsPage));
   Router.setDefault('dashboard');
 }
 
@@ -74,6 +81,7 @@ async function bootstrap() {
   HoldingsStore.init();
   WatchlistStore.init();
   JournalStore.init();
+  AlertsStore.init();
 
   // 5. Reveal app shell, mount components
   document.getElementById('app').hidden = false;
